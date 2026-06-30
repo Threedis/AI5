@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin — Employee Expense Verification</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="css/theme.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<!-- Header (same pattern as dashboard) -->
+<header class="app-header">
+  <button class="sidebar-toggle-btn"><i class="fa-solid fa-bars"></i></button>
+  <div class="brand">
+    <div class="brand-icon"><i class="fa-solid fa-shield-check"></i></div>
+    <span>ExpenseVerify</span>
+    <span class="version-chip">v1.0</span>
+  </div>
+  <div class="header-search">
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <input type="text" placeholder="Search employees, accounts…">
+  </div>
+  <div class="header-actions">
+    <button class="header-btn"><i class="fa-regular fa-bell"></i><span class="badge"></span></button>
+    <div class="dropdown">
+      <div class="user-avatar" data-dropdown="user-menu">AD</div>
+      <div class="dropdown-menu" id="user-menu">
+        <div style="padding:10px 14px 8px;border-bottom:1px solid var(--border);margin-bottom:6px;">
+          <div style="font-size:.85rem;font-weight:700;color:var(--text-primary)" id="dm-name">Administrator</div>
+          <div style="font-size:.75rem;color:var(--text-muted)" id="dm-role">System Administrator</div>
+        </div>
+        <button class="dropdown-item" onclick="window.location.href='dashboard.html'">
+          <i class="fa-solid fa-chart-pie"></i> Dashboard
+        </button>
+        <div class="dropdown-divider"></div>
+        <button class="dropdown-item danger" data-action="logout">
+          <i class="fa-solid fa-right-from-bracket"></i> Sign Out
+        </button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- Sidebar -->
+<aside class="app-sidebar">
+  <nav class="sidebar-nav">
+    <div class="nav-section-label">Main</div>
+    <button class="nav-item" data-page="dashboard.html"><span class="nav-icon"><i class="fa-solid fa-chart-pie"></i></span><span class="nav-label">Dashboard</span></button>
+    <button class="nav-item" data-page="user.html"><span class="nav-icon"><i class="fa-solid fa-magnifying-glass"></i></span><span class="nav-label">Search</span></button>
+
+    <div class="nav-section-label">Administration</div>
+    <button class="nav-item" data-page="admin.html"><span class="nav-icon"><i class="fa-solid fa-users-gear"></i></span><span class="nav-label">Admin Panel</span></button>
+
+    <div class="nav-section-label">HR</div>
+    <button class="nav-item" data-page="hr.html"><span class="nav-icon"><i class="fa-solid fa-upload"></i></span><span class="nav-label">HR Data</span></button>
+
+    <div class="nav-section-label">Accounts</div>
+    <button class="nav-item" data-page="accounts.html"><span class="nav-icon"><i class="fa-solid fa-file-excel"></i></span><span class="nav-label">Bank Advice</span></button>
+
+    <div class="nav-section-label">Verification</div>
+    <button class="nav-item" data-page="user.html"><span class="nav-icon"><i class="fa-solid fa-shield-check"></i></span><span class="nav-label">Verification</span></button>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="sidebar-user">
+      <div class="s-avatar">AD</div>
+      <div class="s-info">
+        <div class="s-name">Administrator</div>
+        <div class="s-role">System Administrator</div>
+      </div>
+    </div>
+  </div>
+</aside>
+<div class="sidebar-overlay"></div>
+
+<!-- Main -->
+<main class="app-main">
+  <div class="breadcrumb-bar">
+    <span class="bc-item"><i class="fa-solid fa-house"></i> Home</span>
+    <span class="bc-sep"><i class="fa-solid fa-chevron-right"></i></span>
+    <span class="bc-item"><a href="dashboard.html">Dashboard</a></span>
+    <span class="bc-sep"><i class="fa-solid fa-chevron-right"></i></span>
+    <span class="bc-item active">Administration</span>
+  </div>
+
+  <div class="page-content">
+    <div class="page-header">
+      <div>
+        <h1 class="page-title"><i class="fa-solid fa-shield-halved" style="color:var(--accent-purple)"></i> Administration</h1>
+        <p class="page-subtitle">Manage users, settings, audit logs, and backups</p>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div data-tab-group>
+      <div class="tabs-nav">
+        <button class="tab-btn active" data-tab="users"><i class="fa-solid fa-users"></i> Users</button>
+        <button class="tab-btn" data-tab="audit"><i class="fa-solid fa-scroll"></i> Audit Logs</button>
+        <button class="tab-btn" data-tab="backup"><i class="fa-solid fa-cloud-arrow-up"></i> Backup</button>
+        <button class="tab-btn" data-tab="settings"><i class="fa-solid fa-sliders"></i> Settings</button>
+        <button class="tab-btn" data-tab="version"><i class="fa-solid fa-code-branch"></i> Versions</button>
+      </div>
+
+      <!-- Users Tab -->
+      <div class="tab-pane active" data-tab="users">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title"><i class="fa-solid fa-users"></i> User Management</div>
+            <button class="btn btn-primary btn-sm" id="add-user-btn">
+              <i class="fa-solid fa-user-plus"></i> Add User
+            </button>
+          </div>
+          <div class="table-toolbar">
+            <div class="table-search">
+              <i class="fa-solid fa-magnifying-glass"></i>
+              <input type="text" id="user-search" placeholder="Search users…">
+            </div>
+            <div style="margin-left:auto;display:flex;gap:8px">
+              <select class="form-control" id="role-filter" style="width:140px;padding:7px 10px;">
+                <option value="">All Roles</option>
+                <option value="admin">Admin</option>
+                <option value="hr">HR</option>
+                <option value="accounts">Accounts</option>
+                <option value="user">User</option>
+              </select>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table" id="users-table">
+              <thead>
+                <tr>
+                  <th>Username</th>
+                  <th>Display Name</th>
+                  <th>Role</th>
+                  <th>Department</th>
+                  <th>Status</th>
+                  <th>Created</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="users-tbody">
+                <tr><td colspan="7" style="text-align:center;padding:40px;color:var(--text-muted)">
+                  <div class="spinner spinner-sm" style="margin:0 auto 10px;"></div>
+                  Loading users…
+                </td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Audit Tab -->
+      <div class="tab-pane" data-tab="audit">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title"><i class="fa-solid fa-scroll"></i> Audit Logs</div>
+            <button class="btn btn-ghost btn-sm" id="export-audit-btn">
+              <i class="fa-solid fa-download"></i> Export
+            </button>
+          </div>
+          <div class="table-toolbar">
+            <div class="table-search">
+              <i class="fa-solid fa-magnifying-glass"></i>
+              <input type="text" id="audit-search" placeholder="Search logs…">
+            </div>
+          </div>
+          <div class="table-wrap" style="max-height:520px;overflow-y:auto;">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Date & Time</th>
+                  <th>User</th>
+                  <th>Role</th>
+                  <th>Module</th>
+                  <th>Action</th>
+                  <th>Status</th>
+                  <th>Detail</th>
+                </tr>
+              </thead>
+              <tbody id="audit-tbody">
+                <tr><td colspan="7" style="text-align:center;padding:40px;color:var(--text-muted)">
+                  Loading audit logs…
+                </td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Backup Tab -->
+      <div class="tab-pane" data-tab="backup">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title"><i class="fa-solid fa-cloud-arrow-up"></i> GitHub Backup</div>
+            </div>
+            <div class="card-body">
+              <p style="font-size:.875rem;color:var(--text-secondary);margin-bottom:16px">
+                Configure your GitHub repository to store encrypted backups.
+                No plain data is ever sent — only AES-256 encrypted JSON.
+              </p>
+              <div class="form-group">
+                <label class="form-label">GitHub Token (PAT)</label>
+                <div class="input-group">
+                  <span class="input-icon"><i class="fa-brands fa-github"></i></span>
+                  <input type="password" class="form-control" id="gh-token" placeholder="ghp_…">
+                  <button class="input-addon" id="gh-token-toggle"><i class="fa-regular fa-eye"></i></button>
+                </div>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Repository (owner/repo)</label>
+                <input type="text" class="form-control" id="gh-repo" placeholder="myorg/expense-db">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Branch</label>
+                <input type="text" class="form-control" id="gh-branch" value="main">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Encryption Key (for backup)</label>
+                <div class="input-group">
+                  <span class="input-icon"><i class="fa-solid fa-key"></i></span>
+                  <input type="password" class="form-control" id="gh-enc-key" placeholder="Min 32 characters">
+                </div>
+                <span class="form-hint">Store this key securely. Lost key = lost backup.</span>
+              </div>
+              <div style="display:flex;gap:10px;flex-wrap:wrap">
+                <button class="btn btn-primary" id="save-gh-settings">
+                  <i class="fa-solid fa-floppy-disk"></i> Save Settings
+                </button>
+                <button class="btn btn-outline" id="test-gh-btn">
+                  <i class="fa-solid fa-plug"></i> Test Connection
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title"><i class="fa-solid fa-cloud-arrow-down"></i> Restore & Rollback</div>
+            </div>
+            <div class="card-body">
+              <p style="font-size:.875rem;color:var(--text-secondary);margin-bottom:16px">
+                Download and restore an encrypted backup from GitHub.
+              </p>
+              <button class="btn btn-outline" id="fetch-backups-btn" style="margin-bottom:16px">
+                <i class="fa-solid fa-rotate"></i> Fetch Backup List
+              </button>
+              <div id="backup-list">
+                <div class="empty-state" style="padding:30px 0">
+                  <div class="empty-icon"><i class="fa-solid fa-cloud-arrow-down"></i></div>
+                  <p>Click "Fetch Backup List" to load backups</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Settings Tab -->
+      <div class="tab-pane" data-tab="settings">
+        <div class="card" style="max-width:640px">
+          <div class="card-header">
+            <div class="card-title"><i class="fa-solid fa-sliders"></i> Application Settings</div>
+          </div>
+          <div class="card-body">
+            <div class="form-group">
+              <label class="form-label">Application Name</label>
+              <input type="text" class="form-control" id="app-name" value="Employee Expense Verification System">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Organization Name</label>
+              <input type="text" class="form-control" id="org-name" placeholder="Your Organization">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Session Timeout (minutes)</label>
+              <input type="number" class="form-control" id="session-timeout" value="30" min="5" max="480">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Max Versions to Keep (HR)</label>
+              <input type="number" class="form-control" id="max-versions" value="10" min="3" max="50">
+            </div>
+            <button class="btn btn-primary" id="save-settings-btn">
+              <i class="fa-solid fa-floppy-disk"></i> Save Settings
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Versions Tab -->
+      <div class="tab-pane" data-tab="version">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title"><i class="fa-solid fa-code-branch"></i> Version History</div>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Version</th><th>Type</th><th>Uploaded By</th>
+                  <th>Date</th><th>Records</th><th>Hash</th><th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="version-tbody">
+                <tr><td colspan="7" style="text-align:center;padding:40px;color:var(--text-muted)">
+                  No version history yet
+                </td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /tab-group -->
+  </div><!-- /page-content -->
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/database.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/audit.js"></script>
+<script src="js/app.js"></script>
+
+<script>
+(async () => {
+  if (!Auth.requireAuth(['admin'])) return;
+  const sess = Auth.getCurrentUser();
+  await App.init();
+
+  document.getElementById('dm-name').textContent = sess.displayName || sess.username;
+  document.getElementById('dm-role').textContent = Auth.getRoleInfo(sess.role).label;
+  document.querySelector('.user-avatar').textContent = Utils.getInitials(sess.displayName || sess.username);
+
+  App.setBreadcrumb([
+    { label: 'Home', icon: 'fa-house' },
+    { label: 'Dashboard' },
+    { label: 'Administration' }
+  ]);
+
+  /* ── Load Users ─────────────────────────────────────────── */
+  async function loadUsers(filter = '') {
+    const users = await Database.getAll('users');
+    const roleFilter = document.getElementById('role-filter').value;
+    let list = users;
+    if (filter) {
+      const q = filter.toLowerCase();
+      list = list.filter(u => u.username.toLowerCase().includes(q) ||
+        (u.displayName || '').toLowerCase().includes(q) ||
+        (u.department || '').toLowerCase().includes(q));
+    }
+    if (roleFilter) list = list.filter(u => u.role === roleFilter);
+
+    const tbody = document.getElementById('users-tbody');
+    if (!list.length) {
+      tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state">
+        <div class="empty-icon"><i class="fa-solid fa-users-slash"></i></div>
+        <h5>No users found</h5></div></td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = list.map(u => {
+      const ri = Auth.getRoleInfo(u.role);
+      const statusBadge = u.status === 'active'
+        ? `<span class="badge badge-green"><i class="fa-solid fa-circle" style="font-size:.5rem"></i> Active</span>`
+        : `<span class="badge badge-gray">Inactive</span>`;
+      return `<tr>
+        <td><strong>${Utils.escapeHtml(u.username)}</strong></td>
+        <td>${Utils.escapeHtml(u.displayName || '—')}</td>
+        <td><span class="role-badge role-${u.role}">${Utils.escapeHtml(ri.label)}</span></td>
+        <td>${Utils.escapeHtml(u.department || '—')}</td>
+        <td>${statusBadge}</td>
+        <td>${Utils.formatDate(u.createdAt)}</td>
+        <td>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-ghost btn-sm" onclick="editUser('${u.id}')">
+              <i class="fa-solid fa-pen"></i>
+            </button>
+            ${u.username !== 'admin' ? `
+            <button class="btn btn-ghost btn-sm" onclick="toggleUser('${u.id}','${u.status}')">
+              <i class="fa-solid fa-${u.status === 'active' ? 'ban' : 'check'}"></i>
+            </button>
+            <button class="btn btn-ghost btn-sm" style="color:var(--accent-red)" onclick="deleteUser('${u.id}')">
+              <i class="fa-solid fa-trash"></i>
+            </button>` : ''}
+          </div>
+        </td>
+      </tr>`;
+    }).join('');
+  }
+
+  await loadUsers();
+
+  document.getElementById('user-search').addEventListener('input', Utils.debounce(e => {
+    loadUsers(e.target.value);
+  }));
+  document.getElementById('role-filter').addEventListener('change', () => {
+    loadUsers(document.getElementById('user-search').value);
+  });
+
+  /* ── Add User ───────────────────────────────────────────── */
+  document.getElementById('add-user-btn').addEventListener('click', () => showUserModal());
+
+  window.editUser = async (id) => {
+    const user = await Database.get('users', id);
+    if (user) showUserModal(user);
+  };
+
+  window.toggleUser = async (id, currentStatus) => {
+    const user = await Database.get('users', id);
+    if (!user) return;
+    user.status = currentStatus === 'active' ? 'inactive' : 'active';
+    await Database.put('users', user);
+    await Audit.log({ module: 'Admin', action: 'ToggleUser', status: 'success', detail: `${user.username} → ${user.status}` });
+    App.Toast.success('Updated', `User ${user.username} is now ${user.status}.`);
+    loadUsers();
+  };
+
+  window.deleteUser = async (id) => {
+    const user = await Database.get('users', id);
+    if (!user) return;
+    const ok = await App.Modal.confirm({
+      title: 'Delete User',
+      message: `Are you sure you want to delete "${user.username}"? This cannot be undone.`,
+      confirmText: 'Delete',
+      confirmClass: 'btn-danger'
+    });
+    if (!ok) return;
+    await Database.delete('users', id);
+    await Audit.log({ module: 'Admin', action: 'DeleteUser', status: 'success', detail: user.username });
+    App.Toast.success('Deleted', `User ${user.username} removed.`);
+    loadUsers();
+  };
+
+  function showUserModal(user = null) {
+    const isEdit = !!user;
+    const { el, close } = App.Modal.create({
+      title: isEdit ? 'Edit User' : 'Add New User',
+      size: '',
+      body: `
+        <div class="form-group">
+          <label class="form-label">Username <span class="required">*</span></label>
+          <input type="text" class="form-control" id="m-username" value="${Utils.escapeHtml(user?.username || '')}"
+                 ${isEdit ? 'readonly' : ''} placeholder="e.g. jsmith">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Display Name</label>
+          <input type="text" class="form-control" id="m-displayname" value="${Utils.escapeHtml(user?.displayName || '')}" placeholder="John Smith">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Role <span class="required">*</span></label>
+          <select class="form-control" id="m-role">
+            ${Auth.getAllRoles().map(r =>
+              `<option value="${r.key}" ${user?.role === r.key ? 'selected' : ''}>${r.label}</option>`
+            ).join('')}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Department</label>
+          <input type="text" class="form-control" id="m-dept" value="${Utils.escapeHtml(user?.department || '')}" placeholder="HR / Accounts / IT">
+        </div>
+        ${!isEdit ? `
+        <div class="form-group">
+          <label class="form-label">Password <span class="required">*</span></label>
+          <div class="input-group">
+            <span class="input-icon"><i class="fa-solid fa-lock"></i></span>
+            <input type="password" class="form-control" id="m-password" placeholder="Min 8 characters">
+          </div>
+        </div>` : `
+        <div class="form-group">
+          <label class="form-label">New Password <span style="font-weight:400;color:var(--text-muted)">(leave blank to keep current)</span></label>
+          <div class="input-group">
+            <span class="input-icon"><i class="fa-solid fa-lock"></i></span>
+            <input type="password" class="form-control" id="m-password" placeholder="Leave blank to keep">
+          </div>
+        </div>`}
+        <div class="form-group">
+          <label class="form-label">Status</label>
+          <select class="form-control" id="m-status">
+            <option value="active"   ${user?.status !== 'inactive' ? 'selected' : ''}>Active</option>
+            <option value="inactive" ${user?.status === 'inactive'  ? 'selected' : ''}>Inactive</option>
+          </select>
+        </div>`,
+      footer: `
+        <button class="btn btn-ghost" id="modal-cancel">Cancel</button>
+        <button class="btn btn-primary" id="modal-save">
+          <i class="fa-solid fa-floppy-disk"></i> ${isEdit ? 'Update' : 'Create'} User
+        </button>`
+    });
+
+    el.querySelector('#modal-cancel').addEventListener('click', close);
+    el.querySelector('#modal-save').addEventListener('click', async () => {
+      const username    = el.querySelector('#m-username').value.trim();
+      const displayName = el.querySelector('#m-displayname').value.trim();
+      const role        = el.querySelector('#m-role').value;
+      const department  = el.querySelector('#m-dept').value.trim();
+      const password    = el.querySelector('#m-password').value;
+      const status      = el.querySelector('#m-status').value;
+
+      if (!username) { App.Toast.error('Validation', 'Username is required.'); return; }
+      if (!isEdit && !password) { App.Toast.error('Validation', 'Password is required.'); return; }
+      if (!isEdit && password.length < 8) { App.Toast.error('Validation', 'Password must be at least 8 characters.'); return; }
+
+      if (!isEdit) {
+        const existing = await Database.getAll('users');
+        if (existing.find(u => u.username.toLowerCase() === username.toLowerCase())) {
+          App.Toast.error('Duplicate', 'A user with that username already exists.');
+          return;
+        }
+      }
+
+      const salt       = user?.salt || Utils.uuid();
+      const passHash   = password
+        ? CryptoJS.SHA256(password + salt).toString()
+        : user?.passwordHash;
+
+      const record = {
+        id:          user?.id || Utils.uuid(),
+        username, displayName, role, department, status,
+        salt, passwordHash: passHash,
+        createdAt:   user?.createdAt || new Date().toISOString(),
+        createdBy:   user?.createdBy || sess.username,
+        updatedAt:   new Date().toISOString()
+      };
+
+      await Database.put('users', record);
+      await Audit.log({ module: 'Admin', action: isEdit ? 'UpdateUser' : 'CreateUser', status: 'success', detail: username });
+      App.Toast.success('Success', `User ${username} ${isEdit ? 'updated' : 'created'}.`);
+      close();
+      loadUsers();
+    });
+  }
+
+  /* ── Load Audit Logs ────────────────────────────────────── */
+  async function loadAuditLogs(filter = '') {
+    const logs = await Audit.getRecent(200);
+    const q    = filter.toLowerCase();
+    const list = filter
+      ? logs.filter(l => l.user.toLowerCase().includes(q) ||
+          l.module.toLowerCase().includes(q) || l.action.toLowerCase().includes(q))
+      : logs;
+
+    const tbody = document.getElementById('audit-tbody');
+    if (!list.length) {
+      tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--text-muted)">No logs found</td></tr>`;
+      return;
+    }
+
+    const statusMap = { success: 'badge-green', error: 'badge-red', warning: 'badge-orange' };
+    tbody.innerHTML = list.map(l => `<tr>
+      <td style="white-space:nowrap;font-size:.8rem;">${Utils.formatDateTime(l.date)}</td>
+      <td>${Utils.escapeHtml(l.user)}</td>
+      <td><span class="role-badge role-${l.role}">${Utils.escapeHtml(Auth.getRoleInfo(l.role).label)}</span></td>
+      <td>${Utils.escapeHtml(l.module)}</td>
+      <td>${Utils.escapeHtml(l.action)}</td>
+      <td><span class="badge ${statusMap[l.status] || 'badge-gray'}">${Utils.escapeHtml(l.status)}</span></td>
+      <td style="font-size:.78rem;color:var(--text-muted)">${Utils.escapeHtml(l.detail || '')}</td>
+    </tr>`).join('');
+  }
+
+  document.getElementById('audit-search').addEventListener('input', Utils.debounce(e => {
+    loadAuditLogs(e.target.value);
+  }));
+
+  /* ── Load tabs on click ─────────────────────────────────── */
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (btn.dataset.tab === 'audit') loadAuditLogs();
+      if (btn.dataset.tab === 'version') loadVersionHistory();
+    });
+  });
+
+  /* ── Version History ────────────────────────────────────── */
+  async function loadVersionHistory() {
+    const versions = await Database.getAll('versionHistory');
+    const tbody = document.getElementById('version-tbody');
+    if (!versions.length) {
+      tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--text-muted)">No versions yet</td></tr>`;
+      return;
+    }
+    const sorted = versions.sort((a,b) => b.version - a.version);
+    tbody.innerHTML = sorted.map(v => `<tr>
+      <td><span class="badge badge-blue">v${v.version}</span></td>
+      <td><span class="badge badge-${v.type === 'hr' ? 'blue' : 'teal'}">${v.type.toUpperCase()}</span></td>
+      <td>${Utils.escapeHtml(v.uploadedBy || '—')}</td>
+      <td>${Utils.formatDateTime(v.uploadedAt)}</td>
+      <td>${Utils.formatNumber(v.recordCount || 0)}</td>
+      <td style="font-size:.72rem;font-family:monospace;color:var(--text-muted)">${(v.hash || '').slice(0,12)}…</td>
+      <td><button class="btn btn-ghost btn-sm">Restore</button></td>
+    </tr>`).join('');
+  }
+
+  /* ── Settings ───────────────────────────────────────────── */
+  const appName  = await Database.getSetting('appName', 'Employee Expense Verification System');
+  const orgName  = await Database.getSetting('orgName', '');
+  const timeout  = await Database.getSetting('sessionTimeout', 30);
+  const maxVer   = await Database.getSetting('maxVersions', 10);
+  document.getElementById('app-name').value       = appName;
+  document.getElementById('org-name').value       = orgName;
+  document.getElementById('session-timeout').value = timeout;
+  document.getElementById('max-versions').value    = maxVer;
+
+  document.getElementById('save-settings-btn').addEventListener('click', async () => {
+    await Database.setSetting('appName',        document.getElementById('app-name').value);
+    await Database.setSetting('orgName',        document.getElementById('org-name').value);
+    await Database.setSetting('sessionTimeout', parseInt(document.getElementById('session-timeout').value));
+    await Database.setSetting('maxVersions',    parseInt(document.getElementById('max-versions').value));
+    await Audit.log({ module: 'Admin', action: 'SaveSettings', status: 'success' });
+    App.Toast.success('Saved', 'Application settings updated.');
+  });
+
+  /* ── GitHub Settings ────────────────────────────────────── */
+  const ghToken  = await Database.getSetting('ghToken',  '');
+  const ghRepo   = await Database.getSetting('ghRepo',   '');
+  const ghBranch = await Database.getSetting('ghBranch', 'main');
+  document.getElementById('gh-token').value  = ghToken;
+  document.getElementById('gh-repo').value   = ghRepo;
+  document.getElementById('gh-branch').value = ghBranch;
+
+  document.getElementById('gh-token-toggle').addEventListener('click', () => {
+    const inp = document.getElementById('gh-token');
+    inp.type = inp.type === 'password' ? 'text' : 'password';
+  });
+
+  document.getElementById('save-gh-settings').addEventListener('click', async () => {
+    await Database.setSetting('ghToken',  document.getElementById('gh-token').value);
+    await Database.setSetting('ghRepo',   document.getElementById('gh-repo').value);
+    await Database.setSetting('ghBranch', document.getElementById('gh-branch').value);
+    await Database.setSetting('ghEncKey', document.getElementById('gh-enc-key').value);
+    App.Toast.success('Saved', 'GitHub settings saved.');
+  });
+
+  document.getElementById('test-gh-btn').addEventListener('click', async () => {
+    const token  = document.getElementById('gh-token').value.trim();
+    const repo   = document.getElementById('gh-repo').value.trim();
+    const branch = document.getElementById('gh-branch').value.trim();
+    if (!token || !repo) { App.Toast.warning('Missing', 'Token and repo are required.'); return; }
+    App.Loader.show('Testing GitHub connection…');
+    try {
+      const res = await fetch(`https://api.github.com/repos/${repo}`, {
+        headers: { Authorization: `token ${token}`, Accept: 'application/vnd.github.v3+json' }
+      });
+      if (res.ok) {
+        App.Toast.success('Connected', `Successfully connected to ${repo}.`);
+      } else {
+        App.Toast.error('Failed', `GitHub returned: ${res.status} ${res.statusText}`);
+      }
+    } catch (e) {
+      App.Toast.error('Error', e.message);
+    } finally {
+      App.Loader.hide();
+    }
+  });
+
+  await Audit.log({ module: 'Admin', action: 'PageView', status: 'success', detail: 'Admin panel opened' });
+})();
+</script>
+
+</body>
+</html>

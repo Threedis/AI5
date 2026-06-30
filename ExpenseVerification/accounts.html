@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Accounts — Employee Expense Verification</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="css/theme.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<header class="app-header">
+  <button class="sidebar-toggle-btn"><i class="fa-solid fa-bars"></i></button>
+  <div class="brand">
+    <div class="brand-icon"><i class="fa-solid fa-shield-check"></i></div>
+    <span>ExpenseVerify</span><span class="version-chip">v1.0</span>
+  </div>
+  <div class="header-search">
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <input type="text" placeholder="Search…">
+  </div>
+  <div class="header-actions">
+    <button class="header-btn"><i class="fa-regular fa-bell"></i></button>
+    <div class="dropdown">
+      <div class="user-avatar" data-dropdown="user-menu">AC</div>
+      <div class="dropdown-menu" id="user-menu">
+        <button class="dropdown-item" onclick="window.location.href='dashboard.html'"><i class="fa-solid fa-chart-pie"></i> Dashboard</button>
+        <div class="dropdown-divider"></div>
+        <button class="dropdown-item danger" data-action="logout"><i class="fa-solid fa-right-from-bracket"></i> Sign Out</button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<aside class="app-sidebar">
+  <nav class="sidebar-nav">
+    <div class="nav-section-label">Main</div>
+    <button class="nav-item" data-page="dashboard.html"><span class="nav-icon"><i class="fa-solid fa-chart-pie"></i></span><span class="nav-label">Dashboard</span></button>
+    <div class="nav-section-label">Accounts Module</div>
+    <button class="nav-item" data-page="accounts.html"><span class="nav-icon"><i class="fa-solid fa-file-excel"></i></span><span class="nav-label">Bank Advice</span></button>
+    <div class="nav-section-label">Verification</div>
+    <button class="nav-item" data-page="user.html"><span class="nav-icon"><i class="fa-solid fa-shield-check"></i></span><span class="nav-label">Verification</span></button>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="sidebar-user">
+      <div class="s-avatar">AC</div>
+      <div class="s-info"><div class="s-name">Accounts User</div><div class="s-role">Accounts</div></div>
+    </div>
+  </div>
+</aside>
+<div class="sidebar-overlay"></div>
+
+<main class="app-main">
+  <div class="breadcrumb-bar">
+    <span class="bc-item"><i class="fa-solid fa-house"></i> Home</span>
+    <span class="bc-sep"><i class="fa-solid fa-chevron-right"></i></span>
+    <span class="bc-item"><a href="dashboard.html">Dashboard</a></span>
+    <span class="bc-sep"><i class="fa-solid fa-chevron-right"></i></span>
+    <span class="bc-item active">Accounts — Bank Advice</span>
+  </div>
+
+  <div class="page-content">
+    <div class="page-header">
+      <div>
+        <h1 class="page-title"><i class="fa-solid fa-calculator" style="color:var(--accent-teal)"></i> Bank Advice Upload</h1>
+        <p class="page-subtitle">Upload SAL / NES bank advice files for verification</p>
+      </div>
+    </div>
+
+    <div style="background:var(--primary-xlight);border:1px solid var(--primary-light);border-radius:var(--radius-md);padding:20px;margin-bottom:24px;display:flex;gap:14px;align-items:flex-start">
+      <i class="fa-solid fa-circle-info" style="color:var(--primary);font-size:1.2rem;margin-top:2px"></i>
+      <div>
+        <div style="font-weight:600;color:var(--primary);margin-bottom:4px">Phase 4 — Accounts Module</div>
+        <div style="font-size:.875rem;color:var(--text-secondary)">
+          The full Accounts parser (SAL/NES multi-section Excel) will be implemented in Phase 4.
+          The page framework is ready.
+        </div>
+      </div>
+    </div>
+
+    <div data-tab-group>
+      <div class="tabs-nav">
+        <button class="tab-btn active" data-tab="upload"><i class="fa-solid fa-upload"></i> Upload</button>
+        <button class="tab-btn" data-tab="records"><i class="fa-solid fa-table"></i> Records</button>
+        <button class="tab-btn" data-tab="batches"><i class="fa-solid fa-layer-group"></i> Batches</button>
+      </div>
+
+      <div class="tab-pane active" data-tab="upload">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title"><i class="fa-solid fa-upload"></i> Upload Bank Advice Files</div>
+            <span class="badge badge-teal">SAL &amp; NES Supported</span>
+          </div>
+          <div class="card-body">
+            <div class="upload-zone" id="acc-upload-zone">
+              <div class="upload-icon"><i class="fa-solid fa-file-excel"></i></div>
+              <h5>Drop one or more Bank Advice Excel files here</h5>
+              <p>Supports .xlsx, .xls — Multiple files allowed</p>
+              <input type="file" id="acc-file-input" accept=".xlsx,.xls" multiple style="display:none">
+            </div>
+            <div id="acc-file-list" style="margin-top:16px;display:flex;flex-direction:column;gap:8px"></div>
+            <div style="margin-top:16px">
+              <h6 style="font-size:.8rem;font-weight:700;color:var(--text-secondary);margin-bottom:10px;text-transform:uppercase;letter-spacing:.04em">
+                Required Columns (auto-detected)
+              </h6>
+              <div style="display:flex;flex-wrap:wrap;gap:8px">
+                ${['SLNO','EMP_CODE','EMP_NAME','BANK NAME','BANK AC NO','NETPAY','PAN','IFSC','NAME IN BANK'].map(c =>
+                  `<span class="badge badge-teal">${c}</span>`).join('')}
+              </div>
+            </div>
+            <div style="margin-top:20px;display:flex;gap:10px">
+              <button class="btn btn-primary" id="acc-parse-btn" disabled>
+                <i class="fa-solid fa-wand-magic-sparkles"></i> Parse & Preview
+              </button>
+              <button class="btn btn-ghost" id="acc-upload-btn" disabled>
+                <i class="fa-solid fa-database"></i> Save to Database
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="tab-pane" data-tab="records">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title"><i class="fa-solid fa-table"></i> Account Records</div>
+            <div id="acc-record-count" style="font-size:.78rem;color:var(--text-muted)">0 records</div>
+          </div>
+          <div class="table-toolbar">
+            <div class="table-search">
+              <i class="fa-solid fa-magnifying-glass"></i>
+              <input type="text" placeholder="Search by name, EMP code, account…" id="acc-view-search">
+            </div>
+          </div>
+          <div class="table-wrap" style="max-height:520px;overflow-y:auto">
+            <table class="data-table">
+              <thead>
+                <tr><th>Sl</th><th>Emp Code</th><th>Name</th><th>Bank</th><th>Account No</th><th>Net Pay</th><th>IFSC</th><th>PAN</th></tr>
+              </thead>
+              <tbody id="acc-view-tbody">
+                <tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-muted)">No accounts data loaded yet</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="tab-pane" data-tab="batches">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title"><i class="fa-solid fa-layer-group"></i> Upload Batches</div>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr><th>Batch ID</th><th>Files</th><th>Records</th><th>Uploaded By</th><th>Date</th><th>Actions</th></tr>
+              </thead>
+              <tbody id="acc-batch-tbody">
+                <tr><td colspan="6" style="text-align:center;padding:40px;color:var(--text-muted)">No batches yet</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/database.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/audit.js"></script>
+<script src="js/app.js"></script>
+
+<script>
+(async () => {
+  if (!Auth.requireAuth(['admin','accounts'])) return;
+  const sess = Auth.getCurrentUser();
+  await App.init();
+  document.querySelector('.user-avatar').textContent = Utils.getInitials(sess.displayName || sess.username);
+  App.setBreadcrumb([{label:'Home',icon:'fa-house'},{label:'Dashboard'},{label:'Bank Advice'}]);
+
+  const zone  = document.getElementById('acc-upload-zone');
+  const input = document.getElementById('acc-file-input');
+  let selectedFiles = [];
+
+  zone.addEventListener('click', () => input.click());
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+  zone.addEventListener('drop', e => {
+    e.preventDefault(); zone.classList.remove('dragover');
+    handleFiles([...e.dataTransfer.files]);
+  });
+  input.addEventListener('change', e => handleFiles([...e.target.files]));
+
+  function handleFiles(files) {
+    const validFiles = files.filter(f => f.name.match(/\.(xlsx|xls)$/i));
+    if (!validFiles.length) { App.Toast.error('Invalid', 'Please upload Excel files only.'); return; }
+    selectedFiles = [...selectedFiles, ...validFiles];
+    renderFileList();
+  }
+
+  function renderFileList() {
+    const list = document.getElementById('acc-file-list');
+    list.innerHTML = selectedFiles.map((f, i) => `
+      <div style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border-radius:var(--radius-sm);border:1px solid var(--border)">
+        <i class="fa-solid fa-file-excel" style="color:var(--accent-green);font-size:1.2rem"></i>
+        <div style="flex:1">
+          <div style="font-weight:600;font-size:.875rem">${Utils.escapeHtml(f.name)}</div>
+          <div style="font-size:.75rem;color:var(--text-muted)">${Utils.formatFileSize(f.size)}</div>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="removeFile(${i})"><i class="fa-solid fa-xmark"></i></button>
+      </div>`).join('');
+    document.getElementById('acc-parse-btn').disabled = !selectedFiles.length;
+  }
+
+  window.removeFile = (i) => {
+    selectedFiles.splice(i, 1);
+    renderFileList();
+    if (!selectedFiles.length) document.getElementById('acc-upload-btn').disabled = true;
+  };
+
+  await Audit.log({ module: 'Accounts', action: 'PageView', status: 'success' });
+})();
+</script>
+</body>
+</html>

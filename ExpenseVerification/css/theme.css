@@ -1,0 +1,98 @@
+/* ============================================================
+   THEME.CSS — Microsoft 365 Inspired Design Tokens
+   Employee Expense Verification System
+   ============================================================ */
+
+:root {
+  /* Brand Colors */
+  --primary:            #0078D4;
+  --primary-dark:       #005A9E;
+  --primary-light:      #C7E0F4;
+  --primary-xlight:     #EFF6FC;
+
+  --accent:             #0091EA;
+  --accent-green:       #107C10;
+  --accent-orange:      #D83B01;
+  --accent-red:         #A4262C;
+  --accent-yellow:      #FFB900;
+  --accent-purple:      #8764B8;
+  --accent-teal:        #038387;
+
+  /* Neutrals */
+  --bg:                 #F5F9FC;
+  --bg-sidebar:         #FFFFFF;
+  --bg-card:            #FFFFFF;
+  --bg-hover:           #F0F6FC;
+  --bg-active:          #EBF3FB;
+
+  --border:             #E1EAEF;
+  --border-strong:      #C8D6DE;
+
+  --text-primary:       #1B2A3A;
+  --text-secondary:     #4A6078;
+  --text-muted:         #7A9BB5;
+  --text-on-primary:    #FFFFFF;
+
+  /* Shadows */
+  --shadow-xs:          0 1px 3px rgba(0,120,212,.06);
+  --shadow-sm:          0 2px 8px rgba(0,120,212,.08);
+  --shadow-md:          0 4px 20px rgba(0,120,212,.12);
+  --shadow-lg:          0 8px 40px rgba(0,120,212,.16);
+  --shadow-card:        0 2px 12px rgba(27,42,58,.08);
+
+  /* Borders */
+  --radius-sm:          8px;
+  --radius-md:          14px;
+  --radius-lg:          20px;
+  --radius-pill:        100px;
+
+  /* Typography */
+  --font:               'Segoe UI', system-ui, -apple-system, sans-serif;
+  --font-mono:          'Cascadia Code', 'Fira Code', monospace;
+
+  /* Transitions */
+  --ease:               cubic-bezier(.4,0,.2,1);
+  --transition:         220ms var(--ease);
+  --transition-slow:    400ms var(--ease);
+
+  /* Layout */
+  --sidebar-width:      260px;
+  --sidebar-collapsed:  72px;
+  --header-h:           60px;
+  --breadcrumb-h:       44px;
+}
+
+/* ── Base Reset ─────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { font-size: 15px; scroll-behavior: smooth; }
+
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text-primary);
+  line-height: 1.6;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: var(--primary); text-decoration: none; transition: color var(--transition); }
+a:hover { color: var(--primary-dark); }
+
+img { max-width: 100%; display: block; }
+
+/* ── Scrollbar ──────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: var(--radius-pill); }
+::-webkit-scrollbar-thumb:hover { background: var(--primary); }
+
+/* ── Selection ──────────────────────────────────────────── */
+::selection { background: var(--primary-light); color: var(--primary-dark); }
+
+/* ── Focus Ring ─────────────────────────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  border-radius: 4px;
+}

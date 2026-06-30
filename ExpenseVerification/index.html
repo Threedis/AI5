@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Employee Expense Verification System</title>
+  <meta http-equiv="refresh" content="0;url=login.html">
+  <link rel="stylesheet" href="css/theme.css">
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      display: flex; align-items: center; justify-content: center;
+      min-height: 100vh; background: var(--bg);
+      color: var(--text-secondary); flex-direction: column; gap: 12px;
+    }
+    .spin {
+      width: 36px; height: 36px;
+      border: 3px solid var(--border);
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="spin"></div>
+  <p>Loading…</p>
+  <script>
+    // Redirect to login or dashboard based on session
+    const sess = sessionStorage.getItem('evs_session') || localStorage.getItem('evs_session');
+    if (sess) {
+      try {
+        const s = JSON.parse(sess);
+        if (!s.expires || Date.now() < s.expires) {
+          window.location.replace('dashboard.html');
+        } else {
+          window.location.replace('login.html');
+        }
+      } catch { window.location.replace('login.html'); }
+    } else {
+      window.location.replace('login.html');
+    }
+  </script>
+</body>
+</html>

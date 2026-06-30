@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HR Data — Employee Expense Verification</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="css/theme.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<header class="app-header">
+  <button class="sidebar-toggle-btn"><i class="fa-solid fa-bars"></i></button>
+  <div class="brand">
+    <div class="brand-icon"><i class="fa-solid fa-shield-check"></i></div>
+    <span>ExpenseVerify</span>
+    <span class="version-chip">v1.0</span>
+  </div>
+  <div class="header-search">
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <input type="text" placeholder="Search employees…">
+  </div>
+  <div class="header-actions">
+    <button class="header-btn"><i class="fa-regular fa-bell"></i></button>
+    <div class="dropdown">
+      <div class="user-avatar" data-dropdown="user-menu">HR</div>
+      <div class="dropdown-menu" id="user-menu">
+        <button class="dropdown-item" onclick="window.location.href='dashboard.html'"><i class="fa-solid fa-chart-pie"></i> Dashboard</button>
+        <div class="dropdown-divider"></div>
+        <button class="dropdown-item danger" data-action="logout"><i class="fa-solid fa-right-from-bracket"></i> Sign Out</button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<aside class="app-sidebar">
+  <nav class="sidebar-nav">
+    <div class="nav-section-label">Main</div>
+    <button class="nav-item" data-page="dashboard.html"><span class="nav-icon"><i class="fa-solid fa-chart-pie"></i></span><span class="nav-label">Dashboard</span></button>
+    <div class="nav-section-label">HR Module</div>
+    <button class="nav-item" data-page="hr.html"><span class="nav-icon"><i class="fa-solid fa-upload"></i></span><span class="nav-label">HR Data</span></button>
+    <div class="nav-section-label">Verification</div>
+    <button class="nav-item" data-page="user.html"><span class="nav-icon"><i class="fa-solid fa-shield-check"></i></span><span class="nav-label">Verification</span></button>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="sidebar-user">
+      <div class="s-avatar">HR</div>
+      <div class="s-info"><div class="s-name">HR User</div><div class="s-role">Human Resources</div></div>
+    </div>
+  </div>
+</aside>
+<div class="sidebar-overlay"></div>
+
+<main class="app-main">
+  <div class="breadcrumb-bar">
+    <span class="bc-item"><i class="fa-solid fa-house"></i> Home</span>
+    <span class="bc-sep"><i class="fa-solid fa-chevron-right"></i></span>
+    <span class="bc-item"><a href="dashboard.html">Dashboard</a></span>
+    <span class="bc-sep"><i class="fa-solid fa-chevron-right"></i></span>
+    <span class="bc-item active">HR Data Management</span>
+  </div>
+
+  <div class="page-content">
+    <div class="page-header">
+      <div>
+        <h1 class="page-title"><i class="fa-solid fa-users" style="color:var(--primary)"></i> HR Data Management</h1>
+        <p class="page-subtitle">Upload and manage the HR Saral master database</p>
+      </div>
+      <div id="current-version-badge" style="display:none">
+        <span class="badge badge-green"><i class="fa-solid fa-database"></i> <span id="cv-label">Current: v0</span></span>
+      </div>
+    </div>
+
+    <!-- Phase 3 placeholder notice -->
+    <div style="background:var(--primary-xlight);border:1px solid var(--primary-light);border-radius:var(--radius-md);padding:20px;margin-bottom:24px;display:flex;gap:14px;align-items:flex-start">
+      <i class="fa-solid fa-circle-info" style="color:var(--primary);font-size:1.2rem;margin-top:2px"></i>
+      <div>
+        <div style="font-weight:600;color:var(--primary);margin-bottom:4px">Phase 3 — HR Module</div>
+        <div style="font-size:.875rem;color:var(--text-secondary)">
+          The full HR upload, validation, versioning, and encryption engine will be implemented in Phase 3.
+          The framework and navigation are ready. Upload functionality coming next.
+        </div>
+      </div>
+    </div>
+
+    <div data-tab-group>
+      <div class="tabs-nav">
+        <button class="tab-btn active" data-tab="upload"><i class="fa-solid fa-upload"></i> Upload</button>
+        <button class="tab-btn" data-tab="validate"><i class="fa-solid fa-circle-check"></i> Validation</button>
+        <button class="tab-btn" data-tab="versions"><i class="fa-solid fa-code-branch"></i> Versions</button>
+        <button class="tab-btn" data-tab="view"><i class="fa-solid fa-table"></i> View Data</button>
+      </div>
+
+      <div class="tab-pane active" data-tab="upload">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title"><i class="fa-solid fa-upload"></i> Upload HR Saral Excel</div>
+          </div>
+          <div class="card-body">
+            <div class="upload-zone" id="hr-upload-zone">
+              <div class="upload-icon"><i class="fa-solid fa-file-excel"></i></div>
+              <h5>Drop HR Excel file here or click to browse</h5>
+              <p>Supports .xlsx, .xls — Max file size: 50 MB</p>
+              <input type="file" id="hr-file-input" accept=".xlsx,.xls" style="display:none">
+            </div>
+            <div id="hr-file-info" style="display:none;margin-top:16px;padding:14px;background:var(--bg);border-radius:var(--radius-sm);border:1px solid var(--border);display:none;align-items:center;gap:12px;">
+              <i class="fa-solid fa-file-excel" style="color:var(--accent-green);font-size:1.4rem"></i>
+              <div style="flex:1">
+                <div id="hr-file-name" style="font-weight:600;font-size:.875rem"></div>
+                <div id="hr-file-size" style="font-size:.78rem;color:var(--text-muted)"></div>
+              </div>
+              <button class="btn btn-ghost btn-sm" id="hr-remove-file"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div style="margin-top:16px">
+              <h6 style="font-size:.8rem;font-weight:700;color:var(--text-secondary);margin-bottom:10px;text-transform:uppercase;letter-spacing:.04em">Required Columns</h6>
+              <div style="display:flex;flex-wrap:wrap;gap:8px">
+                ${['Employee ID','Employee Name','Month','Year','Branch','Division','Bank Name','Bank Account Number','IFSC','Name in Bank'].map(c =>
+                  `<span class="badge badge-blue">${c}</span>`).join('')}
+              </div>
+            </div>
+            <div style="margin-top:20px;display:flex;gap:10px">
+              <button class="btn btn-primary" id="hr-validate-btn" disabled>
+                <i class="fa-solid fa-circle-check"></i> Validate & Preview
+              </button>
+              <button class="btn btn-ghost" id="hr-upload-btn" disabled>
+                <i class="fa-solid fa-database"></i> Upload to Database
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="tab-pane" data-tab="validate">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title"><i class="fa-solid fa-circle-check"></i> Validation Report</div>
+          </div>
+          <div class="card-body">
+            <div class="empty-state">
+              <div class="empty-icon"><i class="fa-solid fa-clipboard-check"></i></div>
+              <h5>No validation run yet</h5>
+              <p>Upload an Excel file and run validation to see the report here.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="tab-pane" data-tab="versions">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title"><i class="fa-solid fa-code-branch"></i> HR Version History</div>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr><th>Version</th><th>Uploaded By</th><th>Date</th><th>Records</th><th>Status</th><th>Actions</th></tr>
+              </thead>
+              <tbody id="hr-version-tbody">
+                <tr><td colspan="6" style="text-align:center;padding:40px;color:var(--text-muted)">No HR versions uploaded yet</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="tab-pane" data-tab="view">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title"><i class="fa-solid fa-table"></i> HR Database Records</div>
+            <div id="hr-record-count" style="font-size:.78rem;color:var(--text-muted)">0 records</div>
+          </div>
+          <div class="table-toolbar">
+            <div class="table-search">
+              <i class="fa-solid fa-magnifying-glass"></i>
+              <input type="text" placeholder="Search by name, ID, IFSC…" id="hr-view-search">
+            </div>
+          </div>
+          <div class="table-wrap" style="max-height:520px;overflow-y:auto">
+            <table class="data-table">
+              <thead>
+                <tr><th>Emp ID</th><th>Name</th><th>Bank</th><th>Account No</th><th>IFSC</th><th>Name in Bank</th><th>Branch</th><th>Division</th></tr>
+              </thead>
+              <tbody id="hr-view-tbody">
+                <tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-muted)">No HR data loaded yet</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/database.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/audit.js"></script>
+<script src="js/app.js"></script>
+
+<script>
+(async () => {
+  if (!Auth.requireAuth(['admin','hr'])) return;
+  const sess = Auth.getCurrentUser();
+  await App.init();
+  document.querySelector('.user-avatar').textContent = Utils.getInitials(sess.displayName || sess.username);
+  App.setBreadcrumb([{label:'Home',icon:'fa-house'},{label:'Dashboard'},{label:'HR Data'}]);
+
+  // Upload zone drag-and-drop
+  const zone = document.getElementById('hr-upload-zone');
+  const fileInput = document.getElementById('hr-file-input');
+
+  zone.addEventListener('click', () => fileInput.click());
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+  zone.addEventListener('drop', e => {
+    e.preventDefault(); zone.classList.remove('dragover');
+    const file = e.dataTransfer.files[0];
+    if (file) handleFile(file);
+  });
+  fileInput.addEventListener('change', e => {
+    if (e.target.files[0]) handleFile(e.target.files[0]);
+  });
+  document.getElementById('hr-remove-file').addEventListener('click', clearFile);
+
+  function handleFile(file) {
+    if (!file.name.match(/\.(xlsx|xls)$/i)) {
+      App.Toast.error('Invalid File', 'Please upload an Excel file (.xlsx or .xls).');
+      return;
+    }
+    document.getElementById('hr-file-info').style.display = 'flex';
+    document.getElementById('hr-file-name').textContent = file.name;
+    document.getElementById('hr-file-size').textContent = Utils.formatFileSize(file.size);
+    document.getElementById('hr-validate-btn').disabled = false;
+    App.Toast.info('File Selected', `${file.name} ready for validation.`);
+  }
+
+  function clearFile() {
+    fileInput.value = '';
+    document.getElementById('hr-file-info').style.display = 'none';
+    document.getElementById('hr-validate-btn').disabled = true;
+    document.getElementById('hr-upload-btn').disabled = true;
+  }
+
+  await Audit.log({ module: 'HR', action: 'PageView', status: 'success' });
+})();
+</script>
+</body>
+</html>

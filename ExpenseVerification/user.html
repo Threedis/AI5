@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Verification — Employee Expense Verification</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="css/theme.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<header class="app-header">
+  <button class="sidebar-toggle-btn"><i class="fa-solid fa-bars"></i></button>
+  <div class="brand">
+    <div class="brand-icon"><i class="fa-solid fa-shield-check"></i></div>
+    <span>ExpenseVerify</span><span class="version-chip">v1.0</span>
+  </div>
+  <div class="header-search">
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <input type="text" id="global-search-input" placeholder="Search by Emp ID, Name, Account…">
+  </div>
+  <div class="header-actions">
+    <button class="header-btn"><i class="fa-regular fa-bell"></i></button>
+    <div class="dropdown">
+      <div class="user-avatar" data-dropdown="user-menu">US</div>
+      <div class="dropdown-menu" id="user-menu">
+        <button class="dropdown-item" onclick="window.location.href='dashboard.html'"><i class="fa-solid fa-chart-pie"></i> Dashboard</button>
+        <div class="dropdown-divider"></div>
+        <button class="dropdown-item danger" data-action="logout"><i class="fa-solid fa-right-from-bracket"></i> Sign Out</button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<aside class="app-sidebar">
+  <nav class="sidebar-nav">
+    <div class="nav-section-label">Main</div>
+    <button class="nav-item" data-page="dashboard.html"><span class="nav-icon"><i class="fa-solid fa-chart-pie"></i></span><span class="nav-label">Dashboard</span></button>
+    <button class="nav-item" data-page="user.html"><span class="nav-icon"><i class="fa-solid fa-magnifying-glass"></i></span><span class="nav-label">Search & Verify</span></button>
+    <div class="nav-section-label">Verification</div>
+    <button class="nav-item" data-page="user.html"><span class="nav-icon"><i class="fa-solid fa-file-pdf"></i></span><span class="nav-label">Upload Approval</span></button>
+    <button class="nav-item" data-page="user.html"><span class="nav-icon"><i class="fa-solid fa-shield-check"></i></span><span class="nav-label">Verify</span></button>
+    <button class="nav-item" data-page="user.html"><span class="nav-icon"><i class="fa-solid fa-file-chart-column"></i></span><span class="nav-label">Reports</span></button>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="sidebar-user">
+      <div class="s-avatar">US</div>
+      <div class="s-info"><div class="s-name">User</div><div class="s-role">Verification</div></div>
+    </div>
+  </div>
+</aside>
+<div class="sidebar-overlay"></div>
+
+<main class="app-main">
+  <div class="breadcrumb-bar">
+    <span class="bc-item"><i class="fa-solid fa-house"></i> Home</span>
+    <span class="bc-sep"><i class="fa-solid fa-chevron-right"></i></span>
+    <span class="bc-item"><a href="dashboard.html">Dashboard</a></span>
+    <span class="bc-sep"><i class="fa-solid fa-chevron-right"></i></span>
+    <span class="bc-item active">Verification</span>
+  </div>
+
+  <div class="page-content">
+    <div class="page-header">
+      <div>
+        <h1 class="page-title"><i class="fa-solid fa-shield-check" style="color:var(--accent-green)"></i> Employee Verification</h1>
+        <p class="page-subtitle">Upload Zoho approval PDF and verify employee bank details</p>
+      </div>
+    </div>
+
+    <!-- Search Bar (prominent) -->
+    <div class="card" style="margin-bottom:20px">
+      <div class="card-body" style="padding:16px">
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <div style="flex:1;min-width:200px" class="table-search">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <input type="text" id="emp-search-input" placeholder="Search by Employee ID, Name, Account Number, PAN, or IFSC…">
+          </div>
+          <button class="btn btn-primary" id="search-btn">
+            <i class="fa-solid fa-magnifying-glass"></i> Search
+          </button>
+          <button class="btn btn-ghost" id="clear-search-btn">Clear</button>
+        </div>
+      </div>
+    </div>
+
+    <div data-tab-group>
+      <div class="tabs-nav">
+        <button class="tab-btn active" data-tab="upload"><i class="fa-solid fa-file-pdf"></i> Upload Approval</button>
+        <button class="tab-btn" data-tab="verify"><i class="fa-solid fa-shield-check"></i> Verify</button>
+        <button class="tab-btn" data-tab="search"><i class="fa-solid fa-magnifying-glass"></i> Search</button>
+        <button class="tab-btn" data-tab="reports"><i class="fa-solid fa-file-chart-column"></i> Reports</button>
+      </div>
+
+      <!-- Upload Approval PDF -->
+      <div class="tab-pane active" data-tab="upload">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title"><i class="fa-solid fa-file-pdf"></i> Zoho Task Approval PDF</div>
+            </div>
+            <div class="card-body">
+              <div class="upload-zone" id="pdf-upload-zone">
+                <div class="upload-icon"><i class="fa-solid fa-file-pdf" style="color:var(--accent-red)"></i></div>
+                <h5>Drop Approval PDF here</h5>
+                <p>Zoho Task Approval document (.pdf)</p>
+                <input type="file" id="pdf-file-input" accept=".pdf" style="display:none">
+              </div>
+              <div id="pdf-file-info" style="display:none;margin-top:14px;padding:12px;background:var(--bg);border-radius:var(--radius-sm);border:1px solid var(--border)">
+                <div style="display:flex;align-items:center;gap:10px">
+                  <i class="fa-solid fa-file-pdf" style="color:var(--accent-red);font-size:1.4rem"></i>
+                  <div style="flex:1">
+                    <div id="pdf-file-name" style="font-weight:600;font-size:.875rem"></div>
+                    <div id="pdf-file-size" style="font-size:.75rem;color:var(--text-muted)"></div>
+                  </div>
+                </div>
+              </div>
+              <button class="btn btn-primary" style="margin-top:16px;width:100%;justify-content:center" id="extract-pdf-btn" disabled>
+                <i class="fa-solid fa-wand-magic-sparkles"></i> Extract & Verify Approval
+              </button>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title"><i class="fa-solid fa-clipboard-check"></i> Approval Status</div>
+            </div>
+            <div class="card-body" id="approval-status-panel">
+              <div class="empty-state" style="padding:30px 0">
+                <div class="empty-icon"><i class="fa-solid fa-file-circle-question"></i></div>
+                <h5>No PDF uploaded</h5>
+                <p>Upload an approval PDF to check status</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style="background:var(--primary-xlight);border:1px solid var(--primary-light);border-radius:var(--radius-md);padding:20px;margin-top:20px;display:flex;gap:14px;">
+          <i class="fa-solid fa-circle-info" style="color:var(--primary);font-size:1.2rem;margin-top:2px"></i>
+          <div>
+            <div style="font-weight:600;color:var(--primary);margin-bottom:4px">Phase 5 — Verification Engine</div>
+            <div style="font-size:.875rem;color:var(--text-secondary)">
+              PDF text extraction (PDF.js), approval keyword detection, and employee verification
+              engine will be fully implemented in Phase 5.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Verify Tab -->
+      <div class="tab-pane" data-tab="verify">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title"><i class="fa-solid fa-shield-check"></i> Verification Results</div>
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-outline btn-sm" id="download-hdfc-btn" disabled>
+                <i class="fa-solid fa-download"></i> HDFC File
+              </button>
+              <button class="btn btn-outline btn-sm" id="download-nes-btn" disabled>
+                <i class="fa-solid fa-download"></i> NES File
+              </button>
+              <button class="btn btn-ghost btn-sm" id="download-excel-btn" disabled>
+                <i class="fa-solid fa-file-excel"></i> Excel
+              </button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Emp ID</th><th>Name</th><th>Amount</th>
+                  <th>HR Account</th><th>Acc Account</th>
+                  <th>HR IFSC</th><th>Acc IFSC</th>
+                  <th>HR Name</th><th>Acc Name</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="verify-tbody">
+                <tr><td colspan="10" style="text-align:center;padding:40px;color:var(--text-muted)">
+                  Upload an approval PDF to start verification
+                </td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Search Tab -->
+      <div class="tab-pane" data-tab="search">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title"><i class="fa-solid fa-magnifying-glass"></i> Employee Search</div>
+          </div>
+          <div class="card-body">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+              <div>
+                <label class="form-label">Search By</label>
+                <select class="form-control" id="search-by">
+                  <option value="all">All Fields</option>
+                  <option value="empId">Employee ID</option>
+                  <option value="name">Employee Name</option>
+                  <option value="account">Account Number</option>
+                  <option value="pan">PAN</option>
+                  <option value="ifsc">IFSC</option>
+                </select>
+              </div>
+              <div>
+                <label class="form-label">Search Term</label>
+                <div class="input-group">
+                  <span class="input-icon"><i class="fa-solid fa-magnifying-glass"></i></span>
+                  <input type="text" class="form-control" id="search-term" placeholder="Enter search term…">
+                </div>
+              </div>
+            </div>
+            <button class="btn btn-primary" id="do-search-btn">
+              <i class="fa-solid fa-magnifying-glass"></i> Search
+            </button>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr><th>Source</th><th>Emp ID</th><th>Name</th><th>Bank</th><th>Account No</th><th>IFSC</th><th>Name in Bank</th></tr>
+              </thead>
+              <tbody id="search-results-tbody">
+                <tr><td colspan="7" style="text-align:center;padding:40px;color:var(--text-muted)">Enter a search term above to find employees</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Reports Tab -->
+      <div class="tab-pane" data-tab="reports">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title"><i class="fa-solid fa-triangle-exclamation"></i> Discrepancy Report</div>
+            </div>
+            <div class="card-body">
+              <p style="font-size:.875rem;color:var(--text-secondary);margin-bottom:16px">
+                Generate a report of all employees with bank detail mismatches, wrong IFSC, wrong account, or missing records.
+              </p>
+              <button class="btn btn-outline" id="gen-discrepancy-btn">
+                <i class="fa-solid fa-file-chart-column"></i> Generate Report
+              </button>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title"><i class="fa-solid fa-file-invoice-dollar"></i> Payment Files</div>
+            </div>
+            <div class="card-body">
+              <p style="font-size:.875rem;color:var(--text-secondary);margin-bottom:16px">
+                Generate HDFC or NES format payment files from verified records.
+              </p>
+              <div style="display:flex;gap:10px;flex-wrap:wrap">
+                <button class="btn btn-outline">
+                  <i class="fa-solid fa-building-columns"></i> HDFC Format
+                </button>
+                <button class="btn btn-outline">
+                  <i class="fa-solid fa-file-excel"></i> NES Format
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:20px">
+          <div class="card-header">
+            <div class="card-title"><i class="fa-solid fa-table"></i> Discrepancy Details</div>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr><th>Emp ID</th><th>Name</th><th>Reason</th><th>HR Value</th><th>Account Value</th><th>Date</th></tr>
+              </thead>
+              <tbody>
+                <tr><td colspan="6" style="text-align:center;padding:40px;color:var(--text-muted)">No discrepancies to display</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/database.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/audit.js"></script>
+<script src="js/app.js"></script>
+
+<script>
+(async () => {
+  if (!Auth.requireAuth()) return;
+  const sess = Auth.getCurrentUser();
+  await App.init();
+  document.querySelector('.user-avatar').textContent = Utils.getInitials(sess.displayName || sess.username);
+  App.setBreadcrumb([{label:'Home',icon:'fa-house'},{label:'Dashboard'},{label:'Verification'}]);
+
+  // PDF upload zone
+  const pdfZone  = document.getElementById('pdf-upload-zone');
+  const pdfInput = document.getElementById('pdf-file-input');
+
+  pdfZone.addEventListener('click', () => pdfInput.click());
+  pdfZone.addEventListener('dragover', e => { e.preventDefault(); pdfZone.classList.add('dragover'); });
+  pdfZone.addEventListener('dragleave', () => pdfZone.classList.remove('dragover'));
+  pdfZone.addEventListener('drop', e => {
+    e.preventDefault(); pdfZone.classList.remove('dragover');
+    const file = e.dataTransfer.files[0];
+    if (file) handlePDF(file);
+  });
+  pdfInput.addEventListener('change', e => { if (e.target.files[0]) handlePDF(e.target.files[0]); });
+
+  function handlePDF(file) {
+    if (!file.name.match(/\.pdf$/i)) {
+      App.Toast.error('Invalid File', 'Please upload a PDF file.');
+      return;
+    }
+    document.getElementById('pdf-file-info').style.display = 'block';
+    document.getElementById('pdf-file-name').textContent = file.name;
+    document.getElementById('pdf-file-size').textContent = Utils.formatFileSize(file.size);
+    document.getElementById('extract-pdf-btn').disabled = false;
+    App.Toast.info('PDF Selected', `${file.name} ready for extraction.`);
+  }
+
+  // Search functionality (cross HR + Accounts)
+  document.getElementById('do-search-btn').addEventListener('click', async () => {
+    const term  = document.getElementById('search-term').value.trim();
+    const field = document.getElementById('search-by').value;
+    if (!term) { App.Toast.warning('Search', 'Please enter a search term.'); return; }
+
+    App.Loader.show('Searching…');
+    try {
+      const hrAll  = await Database.getAll('hrMaster');
+      const accAll = await Database.getAll('accountsMaster');
+
+      const q   = term.toLowerCase();
+      const matches = (rec, src) => {
+        if (field === 'all') return Object.values(rec).some(v => String(v).toLowerCase().includes(q));
+        const fieldMap = {
+          empId:   ['employeeId','empCode'],
+          name:    ['employeeName','empName'],
+          account: ['bankAccountNumber','bankAcNo'],
+          pan:     ['pan'],
+          ifsc:    ['ifsc']
+        };
+        return (fieldMap[field] || []).some(k => String(rec[k] || '').toLowerCase().includes(q));
+      };
+
+      const hrResults  = hrAll.filter(r => matches(r, 'HR')).map(r => ({ ...r, _source: 'HR' }));
+      const accResults = accAll.filter(r => matches(r, 'Accounts')).map(r => ({ ...r, _source: 'Accounts' }));
+      const results    = [...hrResults, ...accResults];
+
+      const tbody = document.getElementById('search-results-tbody');
+      if (!results.length) {
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--text-muted)">No results found for "${Utils.escapeHtml(term)}"</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = results.map(r => `<tr>
+        <td><span class="badge badge-${r._source === 'HR' ? 'blue' : 'teal'}">${r._source}</span></td>
+        <td>${Utils.escapeHtml(r.employeeId || r.empCode || '—')}</td>
+        <td>${Utils.escapeHtml(r.employeeName || r.empName || '—')}</td>
+        <td>${Utils.escapeHtml(r.bankName || '—')}</td>
+        <td style="font-family:monospace;font-size:.8rem">${Utils.escapeHtml(r.bankAccountNumber || r.bankAcNo || '—')}</td>
+        <td style="font-family:monospace;font-size:.8rem">${Utils.escapeHtml(r.ifsc || '—')}</td>
+        <td>${Utils.escapeHtml(r.nameInBank || '—')}</td>
+      </tr>`).join('');
+
+      App.Toast.success('Search', `Found ${results.length} result(s).`);
+    } finally {
+      App.Loader.hide();
+    }
+  });
+
+  // Handle URL search parameter
+  const urlSearch = new URLSearchParams(window.location.search).get('search');
+  if (urlSearch) {
+    document.getElementById('search-term').value = urlSearch;
+    document.querySelector('[data-tab="search"]').click();
+    document.getElementById('do-search-btn').click();
+  }
+
+  await Audit.log({ module: 'User', action: 'PageView', status: 'success' });
+})();
+</script>
+</body>
+</html>

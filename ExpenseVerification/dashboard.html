@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard — Employee Expense Verification</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+  <link rel="stylesheet" href="css/theme.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<!-- ── Header ─────────────────────────────────────────────── -->
+<header class="app-header">
+  <button class="sidebar-toggle-btn" aria-label="Toggle sidebar">
+    <i class="fa-solid fa-bars"></i>
+  </button>
+
+  <div class="brand">
+    <div class="brand-icon"><i class="fa-solid fa-shield-check"></i></div>
+    <span>ExpenseVerify</span>
+    <span class="version-chip">v1.0</span>
+  </div>
+
+  <div class="header-search">
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <input type="text" placeholder="Search employees, accounts…" aria-label="Global search">
+  </div>
+
+  <div class="header-actions">
+    <button class="header-btn" aria-label="Notifications" data-tooltip="Notifications">
+      <i class="fa-regular fa-bell"></i>
+      <span class="badge"></span>
+    </button>
+    <button class="header-btn" aria-label="Help" data-tooltip="Help">
+      <i class="fa-regular fa-circle-question"></i>
+    </button>
+    <div class="dropdown">
+      <div class="user-avatar" data-dropdown="user-menu" aria-label="User menu"
+           role="button" tabindex="0">AD</div>
+      <div class="dropdown-menu" id="user-menu">
+        <div style="padding:10px 14px 8px; border-bottom:1px solid var(--border); margin-bottom:6px;">
+          <div style="font-size:.85rem;font-weight:700;color:var(--text-primary)" id="dm-name">Administrator</div>
+          <div style="font-size:.75rem;color:var(--text-muted)" id="dm-role">admin</div>
+        </div>
+        <button class="dropdown-item" onclick="window.location.href='admin.html'">
+          <i class="fa-solid fa-gear"></i> Settings
+        </button>
+        <button class="dropdown-item">
+          <i class="fa-regular fa-user"></i> My Profile
+        </button>
+        <div class="dropdown-divider"></div>
+        <button class="dropdown-item danger" data-action="logout">
+          <i class="fa-solid fa-right-from-bracket"></i> Sign Out
+        </button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ── Sidebar ─────────────────────────────────────────────── -->
+<aside class="app-sidebar">
+
+  <nav class="sidebar-nav" role="navigation" aria-label="Main navigation">
+
+    <!-- Dashboard -->
+    <div class="nav-section-label">Main</div>
+    <button class="nav-item" data-page="dashboard.html">
+      <span class="nav-icon"><i class="fa-solid fa-chart-pie"></i></span>
+      <span class="nav-label">Dashboard</span>
+    </button>
+
+    <!-- Search -->
+    <button class="nav-item" data-page="user.html">
+      <span class="nav-icon"><i class="fa-solid fa-magnifying-glass"></i></span>
+      <span class="nav-label">Search</span>
+    </button>
+
+    <!-- Role-based sections rendered by JS -->
+    <div id="nav-admin-section" style="display:none">
+      <div class="nav-section-label">Administration</div>
+      <button class="nav-item" data-page="admin.html" data-tab="users">
+        <span class="nav-icon"><i class="fa-solid fa-users-gear"></i></span>
+        <span class="nav-label">Manage Users</span>
+      </button>
+      <button class="nav-item" data-page="admin.html" data-tab="audit">
+        <span class="nav-icon"><i class="fa-solid fa-scroll"></i></span>
+        <span class="nav-label">Audit Logs</span>
+      </button>
+      <button class="nav-item" data-page="admin.html" data-tab="backup">
+        <span class="nav-icon"><i class="fa-solid fa-cloud-arrow-up"></i></span>
+        <span class="nav-label">Backup & Restore</span>
+      </button>
+      <button class="nav-item" data-page="admin.html" data-tab="settings">
+        <span class="nav-icon"><i class="fa-solid fa-sliders"></i></span>
+        <span class="nav-label">App Settings</span>
+      </button>
+    </div>
+
+    <div id="nav-hr-section" style="display:none">
+      <div class="nav-section-label">HR</div>
+      <button class="nav-item" data-page="hr.html" data-tab="upload">
+        <span class="nav-icon"><i class="fa-solid fa-upload"></i></span>
+        <span class="nav-label">Upload HR Data</span>
+      </button>
+      <button class="nav-item" data-page="hr.html" data-tab="versions">
+        <span class="nav-icon"><i class="fa-solid fa-code-branch"></i></span>
+        <span class="nav-label">Version History</span>
+      </button>
+      <button class="nav-item" data-page="hr.html" data-tab="validate">
+        <span class="nav-icon"><i class="fa-solid fa-circle-check"></i></span>
+        <span class="nav-label">Validation Report</span>
+      </button>
+    </div>
+
+    <div id="nav-accounts-section" style="display:none">
+      <div class="nav-section-label">Accounts</div>
+      <button class="nav-item" data-page="accounts.html" data-tab="upload">
+        <span class="nav-icon"><i class="fa-solid fa-file-excel"></i></span>
+        <span class="nav-label">Upload Bank Advice</span>
+      </button>
+      <button class="nav-item" data-page="accounts.html" data-tab="records">
+        <span class="nav-icon"><i class="fa-solid fa-table"></i></span>
+        <span class="nav-label">View Records</span>
+      </button>
+    </div>
+
+    <div id="nav-user-section" style="display:none">
+      <div class="nav-section-label">Verification</div>
+      <button class="nav-item" data-page="user.html" data-tab="upload">
+        <span class="nav-icon"><i class="fa-solid fa-file-pdf"></i></span>
+        <span class="nav-label">Upload Approval</span>
+      </button>
+      <button class="nav-item" data-page="user.html" data-tab="verify">
+        <span class="nav-icon"><i class="fa-solid fa-shield-check"></i></span>
+        <span class="nav-label">Verify Employees</span>
+      </button>
+      <button class="nav-item" data-page="user.html" data-tab="reports">
+        <span class="nav-icon"><i class="fa-solid fa-file-chart-column"></i></span>
+        <span class="nav-label">Reports</span>
+      </button>
+    </div>
+
+  </nav>
+
+  <div class="sidebar-footer">
+    <div class="sidebar-user" data-action="logout">
+      <div class="s-avatar">AD</div>
+      <div class="s-info">
+        <div class="s-name">Administrator</div>
+        <div class="s-role">System Administrator</div>
+      </div>
+    </div>
+  </div>
+
+</aside>
+
+<!-- Sidebar overlay for mobile -->
+<div class="sidebar-overlay"></div>
+
+<!-- ── Main Content ─────────────────────────────────────────── -->
+<main class="app-main">
+
+  <!-- Breadcrumb -->
+  <div class="breadcrumb-bar">
+    <span class="bc-item">
+      <i class="fa-solid fa-house"></i> Home
+    </span>
+    <span class="bc-sep"><i class="fa-solid fa-chevron-right"></i></span>
+    <span class="bc-item active">Dashboard</span>
+  </div>
+
+  <div class="page-content">
+
+    <!-- Page Header -->
+    <div class="page-header">
+      <div>
+        <h1 class="page-title">Dashboard</h1>
+        <p class="page-subtitle" id="dash-subtitle">
+          Welcome back! Here's what's happening today.
+        </p>
+      </div>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <span id="last-updated" style="font-size:.78rem;color:var(--text-muted)"></span>
+        <button class="btn btn-outline btn-sm" id="refresh-btn">
+          <i class="fa-solid fa-rotate-right"></i> Refresh
+        </button>
+      </div>
+    </div>
+
+    <!-- ── Stats Grid ────────────────────────────────────────── -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-icon blue"><i class="fa-solid fa-database"></i></div>
+        <div class="stat-body">
+          <div class="stat-value" id="stat-hr-upload">—</div>
+          <div class="stat-label">Latest HR Database</div>
+          <div class="stat-change up" id="stat-hr-date" style="font-weight:400;color:var(--text-muted)">
+            <i class="fa-regular fa-clock"></i> —
+          </div>
+        </div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-icon teal"><i class="fa-solid fa-file-invoice-dollar"></i></div>
+        <div class="stat-body">
+          <div class="stat-value" id="stat-acc-upload">0</div>
+          <div class="stat-label">Account Batches</div>
+          <div class="stat-change" id="stat-acc-date" style="font-weight:400;color:var(--text-muted)">
+            <i class="fa-regular fa-clock"></i> —
+          </div>
+        </div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-icon yellow"><i class="fa-solid fa-hourglass-half"></i></div>
+        <div class="stat-body">
+          <div class="stat-value" id="stat-pending">0</div>
+          <div class="stat-label">Pending Verification</div>
+        </div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-icon green"><i class="fa-solid fa-circle-check"></i></div>
+        <div class="stat-body">
+          <div class="stat-value" id="stat-matched">0</div>
+          <div class="stat-label">Matched</div>
+        </div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-icon red"><i class="fa-solid fa-circle-exclamation"></i></div>
+        <div class="stat-body">
+          <div class="stat-value" id="stat-mismatch">0</div>
+          <div class="stat-label">Mismatch</div>
+        </div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-icon purple"><i class="fa-solid fa-calendar-day"></i></div>
+        <div class="stat-body">
+          <div class="stat-value" id="stat-today-uploads">0</div>
+          <div class="stat-label">Today's Uploads</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Charts + Activity ───────────────────────────────── -->
+    <div class="dashboard-grid">
+
+      <!-- Monthly Upload Chart -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">
+            <i class="fa-solid fa-chart-bar"></i> Monthly Uploads
+          </div>
+          <div style="font-size:.75rem;color:var(--text-muted)">Last 6 months</div>
+        </div>
+        <div class="card-body">
+          <div class="chart-container">
+            <canvas id="chart-monthly"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Verification Status Chart -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">
+            <i class="fa-solid fa-chart-pie"></i> Verification Status
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="chart-container">
+            <canvas id="chart-status"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Activity Feed -->
+      <div class="card span-2">
+        <div class="card-header">
+          <div class="card-title">
+            <i class="fa-solid fa-bolt"></i> Recent Activity
+          </div>
+          <button class="btn btn-ghost btn-sm" onclick="window.location.href='admin.html'">
+            View All <i class="fa-solid fa-arrow-right"></i>
+          </button>
+        </div>
+        <div class="card-body" id="activity-feed" style="padding-top:4px;">
+          <!-- Filled by JS -->
+          <div class="skeleton" style="height:52px;margin-bottom:8px;border-radius:8px;"></div>
+          <div class="skeleton" style="height:52px;margin-bottom:8px;border-radius:8px;opacity:.7;"></div>
+          <div class="skeleton" style="height:52px;border-radius:8px;opacity:.4;"></div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ── Quick Actions ─────────────────────────────────────── -->
+    <div class="card" id="quick-actions-card">
+      <div class="card-header">
+        <div class="card-title">
+          <i class="fa-solid fa-rocket"></i> Quick Actions
+        </div>
+      </div>
+      <div class="card-body">
+        <div style="display:flex;gap:12px;flex-wrap:wrap;" id="quick-actions-list">
+          <!-- Filled by JS based on role -->
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /page-content -->
+
+</main>
+
+<!-- External Libraries -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+
+<!-- App Scripts -->
+<script src="js/utils.js"></script>
+<script src="js/database.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/audit.js"></script>
+<script src="js/app.js"></script>
+<script src="js/dashboard.js"></script>
+
+<script>
+(async () => {
+
+  /* ── Auth Guard ─────────────────────────────────────────── */
+  if (!Auth.requireAuth()) return;
+
+  const sess = Auth.getCurrentUser();
+
+  /* ── Bootstrap UI ───────────────────────────────────────── */
+  await App.init();
+
+  /* ── Set user info in header dropdown ───────────────────── */
+  document.getElementById('dm-name').textContent = sess.displayName || sess.username;
+  document.getElementById('dm-role').textContent = Auth.getRoleInfo(sess.role).label;
+  document.querySelector('.user-avatar').textContent = Utils.getInitials(sess.displayName || sess.username);
+
+  /* ── Welcome message ────────────────────────────────────── */
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+  document.getElementById('dash-subtitle').textContent =
+    `${greeting}, ${sess.displayName || sess.username}! Here's your workspace overview.`;
+
+  /* ── Show nav sections by role ──────────────────────────── */
+  const role = sess.role;
+  if (['admin'].includes(role))           document.getElementById('nav-admin-section').style.display = '';
+  if (['admin','hr'].includes(role))      document.getElementById('nav-hr-section').style.display = '';
+  if (['admin','accounts'].includes(role))document.getElementById('nav-accounts-section').style.display = '';
+  document.getElementById('nav-user-section').style.display = '';
+
+  /* ── Quick Actions ──────────────────────────────────────── */
+  const actions = {
+    admin: [
+      { icon: 'fa-users-gear', label: 'Manage Users',    href: 'admin.html' },
+      { icon: 'fa-cloud-arrow-up', label: 'Backup Now',   href: 'admin.html' },
+      { icon: 'fa-scroll', label: 'View Audit Logs',      href: 'admin.html' }
+    ],
+    hr: [
+      { icon: 'fa-upload', label: 'Upload HR Excel',     href: 'hr.html' },
+      { icon: 'fa-code-branch', label: 'Version History', href: 'hr.html' },
+      { icon: 'fa-circle-check', label: 'Validate Data',  href: 'hr.html' }
+    ],
+    accounts: [
+      { icon: 'fa-file-excel', label: 'Upload Bank Advice', href: 'accounts.html' },
+      { icon: 'fa-table', label: 'View Records',            href: 'accounts.html' }
+    ],
+    user: [
+      { icon: 'fa-file-pdf', label: 'Upload Approval',       href: 'user.html' },
+      { icon: 'fa-shield-check', label: 'Verify Employees',  href: 'user.html' },
+      { icon: 'fa-file-chart-column', label: 'View Reports', href: 'user.html' }
+    ]
+  };
+
+  const roleActions = role === 'admin'
+    ? [...actions.admin, ...actions.hr, ...actions.accounts, ...actions.user]
+    : (actions[role] || actions.user);
+
+  document.getElementById('quick-actions-list').innerHTML = roleActions.map(a => `
+    <button class="btn btn-outline" onclick="window.location.href='${a.href}'">
+      <i class="fa-solid ${a.icon}"></i> ${Utils.escapeHtml(a.label)}
+    </button>`).join('');
+
+  /* ── Load dashboard data ────────────────────────────────── */
+  await Dashboard.init();
+
+  /* ── Last updated ───────────────────────────────────────── */
+  document.getElementById('last-updated').textContent =
+    `Last updated: ${Utils.formatDateTime(new Date())}`;
+
+  /* ── Refresh button ─────────────────────────────────────── */
+  document.getElementById('refresh-btn').addEventListener('click', async () => {
+    App.Loader.show('Refreshing…');
+    await Dashboard.init();
+    document.getElementById('last-updated').textContent =
+      `Last updated: ${Utils.formatDateTime(new Date())}`;
+    App.Loader.hide();
+    App.Toast.success('Refreshed', 'Dashboard data updated.');
+  });
+
+})();
+</script>
+
+</body>
+</html>
