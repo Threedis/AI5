@@ -47,9 +47,22 @@ const HR = (() => {
       if (!hasMandatory) continue;
 
       /* Parse data rows */
+      let firstDataRow = true;
       for (let r = headerRowIdx + 1; r < rows.length; r++) {
         const row = rows[r];
         if (row.every(c => String(c).trim() === '')) continue; // blank row
+
+        /* Skip the first non-blank row after the header if it looks like a
+           summary/total row (contains "total", "count", "sr.no", "s.no",
+           or has empty key fields with only a numeric count value). */
+        if (firstDataRow) {
+          firstDataRow = false;
+          const cells = row.map(c => String(c).trim().toLowerCase());
+          const isSummary =
+            cells.some(c => /\btotal\b|\bcount\b|^sr\.?\s*no\.?$|^s\.?\s*no\.?$|no\.\s*of/i.test(c)) ||
+            (cells.filter(c => c !== '').length <= 2 && cells.some(c => /^\d+$/.test(c)));
+          if (isSummary) continue;
+        }
 
         const rec = {};
         for (const [field, idx] of Object.entries(colIdx)) {
