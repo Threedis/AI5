@@ -285,6 +285,45 @@
             </div>
           </div>
           <div class="card-body">
+
+            <!-- Month / Year for this upload -->
+            <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:18px;padding:14px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-md);align-items:flex-end">
+              <div style="flex:1;min-width:140px">
+                <label class="form-label" for="upload-month" style="font-size:.8rem">
+                  <i class="fa-solid fa-calendar-days" style="color:var(--primary)"></i>
+                  Month <span class="required">*</span>
+                </label>
+                <select id="upload-month" class="form-control" style="padding:7px 10px">
+                  <option value="">— Select Month —</option>
+                  <option value="January">January</option>
+                  <option value="February">February</option>
+                  <option value="March">March</option>
+                  <option value="April">April</option>
+                  <option value="May">May</option>
+                  <option value="June">June</option>
+                  <option value="July">July</option>
+                  <option value="August">August</option>
+                  <option value="September">September</option>
+                  <option value="October">October</option>
+                  <option value="November">November</option>
+                  <option value="December">December</option>
+                </select>
+              </div>
+              <div style="flex:1;min-width:120px">
+                <label class="form-label" for="upload-year" style="font-size:.8rem">
+                  <i class="fa-solid fa-calendar" style="color:var(--primary)"></i>
+                  Year <span class="required">*</span>
+                </label>
+                <input type="number" id="upload-year" class="form-control"
+                       placeholder="e.g. 2025" min="2000" max="2099"
+                       style="padding:7px 10px">
+              </div>
+              <div style="font-size:.78rem;color:var(--text-muted);padding-bottom:2px">
+                <i class="fa-solid fa-circle-info"></i>
+                Applied to all records where Month/Year is blank in the Excel.
+              </div>
+            </div>
+
             <label class="upload-zone" id="hr-upload-zone" for="hr-file-input">
               <div class="upload-icon"><i class="fa-solid fa-file-excel"></i></div>
               <h5>Drop HR Excel here or click to browse</h5>
@@ -639,6 +678,9 @@
     { label: 'HR Data Management' }
   ]);
 
+  /* ── Pre-fill current year ─────────────────────────────── */
+  document.getElementById('upload-year').value = new Date().getFullYear();
+
   /* ── State ──────────────────────────────────────────────── */
   let _selectedFile      = null;
   let _parsedRecords     = [];
@@ -764,6 +806,13 @@
 
   async function runValidation() {
     if (!_selectedFile) return;
+
+    const uploadMonth = document.getElementById('upload-month').value.trim();
+    const uploadYear  = document.getElementById('upload-year').value.trim();
+    if (!uploadMonth || !uploadYear) {
+      App.Toast.warning('Month / Year Required', 'Please select the Month and Year for this upload before validating.');
+      return;
+    }
 
     document.getElementById('hr-validate-btn').disabled = true;
     document.getElementById('validation-progress').style.display = '';
@@ -1052,6 +1101,17 @@
 
     App.Loader.show('Encrypting records with AES-256…');
     try {
+      /* Apply upload-level Month/Year to records that have blank values */
+      const uploadMonth = document.getElementById('upload-month').value.trim();
+      const uploadYear  = document.getElementById('upload-year').value.trim();
+      if (uploadMonth || uploadYear) {
+        _parsedRecords = _parsedRecords.map(r => ({
+          ...r,
+          month: r.month || uploadMonth,
+          year:  r.year  || uploadYear
+        }));
+      }
+
       const validSummary = {
         errors:   _validationResult?.errors.length   || 0,
         warnings: _validationResult?.warnings.length || 0,
