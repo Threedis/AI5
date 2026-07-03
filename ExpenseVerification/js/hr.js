@@ -52,28 +52,13 @@ const HR = (() => {
         const row = rows[r];
         if (row.every(c => String(c).trim() === '')) continue; // blank row
 
-        /* Skip the first non-blank row after the header if it is a group/count
-           summary row — not an actual employee record. Detection criteria:
-           (a) any cell matches known summary keywords, OR
-           (b) the employee-id and employee-name columns are both empty/non-text
-               while at least one cell looks like a bare record count number. */
+        /* Skip the first non-blank row after the header if it has no Employee ID
+           — it is a group/count summary row, not an actual employee record. */
         if (firstDataRow) {
           firstDataRow = false;
-          const cells   = row.map(c => String(c).trim());
-          const lower   = cells.map(c => c.toLowerCase());
-          const nonEmpty = cells.filter(c => c !== '');
-
-          const hasSummaryKeyword = lower.some(c =>
-            /\btotal\b|\bcount\b|group\s*count|record\s*count|no\.\s*of\s*(emp|rec|row)|^sr\.?\s*no\.?$|^s\.?\s*no\.?$|^serial\s*no\.?$|\bsummary\b|\bsubtotal\b|\bgrand\s*total\b/i.test(c)
-          );
-
-          /* Key fields blank + row has ≤3 non-empty cells, one of which is purely numeric */
-          const empId   = colIdx.employeeId   !== undefined ? cells[colIdx.employeeId]   : '';
-          const empName = colIdx.employeeName !== undefined ? cells[colIdx.employeeName] : '';
-          const keyFieldsEmpty = !empId && !empName;
-          const hasBareNumber  = nonEmpty.length <= 3 && nonEmpty.some(c => /^\d+$/.test(c));
-
-          if (hasSummaryKeyword || (keyFieldsEmpty && hasBareNumber)) continue;
+          const cells = row.map(c => String(c).trim());
+          const empId = colIdx.employeeId !== undefined ? cells[colIdx.employeeId] : '';
+          if (!empId) continue;
         }
 
         const rec = {};
