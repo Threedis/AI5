@@ -84,7 +84,8 @@ const Accounts = (() => {
       if (pat.test(name) || pat.test(accNo)) return true;
     }
 
-    if (!accNo && !empCode) return true;
+    // Skip rows missing all identity fields (e.g. sub-total or label rows between sections)
+    if (!accNo && !empCode && !name) return true;
 
     return false;
   }
@@ -279,7 +280,7 @@ const Accounts = (() => {
 
       // Name in bank (optional)
       if (!rec.nameInBank) {
-        warnings.push({ row: idx + 1, field: 'nameInBank', type: 'MISSING_NAME_IN_BANK', message: 'Name not provided', value: '', rowLabel });
+        warnings.push({ row: idx + 1, field: 'nameInBank', type: 'MISSING_NAME_IN_BANK', message: 'Name in bank not provided', value: '', rowLabel });
       }
 
       // Bank name (optional)
