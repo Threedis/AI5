@@ -84,7 +84,8 @@ const Accounts = (() => {
       if (pat.test(name) || pat.test(accNo)) return true;
     }
 
-    if (!accNo && !empCode) return true;
+    // Skip rows missing all identity fields (e.g. sub-total or label rows between sections)
+    if (!accNo && !empCode && !name) return true;
 
     return false;
   }
