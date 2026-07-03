@@ -14,8 +14,8 @@ const HR = (() => {
     branch:            ['branch','branch name','branch_name','location'],
     division:          ['division','div','division name','department','dept'],
     bankName:          ['bank name','bank','bankname','bank_name','bank nm'],
-    bankAccountNumber: ['bank account number','account number','acc no','account no','bank ac no','bank_account_number','account_number','bank account no','acno','ac no','bankacno'],
-    ifsc:              ['ifsc','ifsc code','ifsccode','ifsc_code','rtgs code','neft code'],
+    bankAccountNumber: ['bank account number','account number','acc no','account no','bank ac no','bank_account_number','account_number','bank account no','acno','ac no','bankacno','bank a/c no','a/c no','ac number','bank acc no','bank acc number','account_no'],
+    ifsc:              ['ifsc','ifsc code','ifsccode','ifsc_code','rtgs code','neft code','bank ifsc','bank ifsc code','ifsc no','bank_ifsc'],
     nameInBank:        ['name in bank','bank account name','account holder name','name as in bank','name_in_bank','beneficiary name','holder name']
   };
 
