@@ -6,7 +6,7 @@
 const Database = (() => {
 
   const DB_NAME    = 'ExpenseVerificationDB';
-  const DB_VERSION = 1;
+  const DB_VERSION = 2;
   let   _db        = null;
 
   /* ── Store definitions ──────────────────────────────────── */
@@ -33,6 +33,10 @@ const Database = (() => {
     verifications:  { keyPath: 'id', indexes: [
                        { name: 'batchId', unique: false },
                        { name: 'status',  unique: false }
+                     ]},
+    accountsBatches:{ keyPath: 'id', indexes: [
+                       { name: 'batchNo',  unique: false },
+                       { name: 'isActive', unique: false }
                      ]}
   };
 
