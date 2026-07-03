@@ -27,7 +27,7 @@ const Accounts = (() => {
   };
 
   /* ── Section header keywords (HDFC, NEFT, HOLD, CHEQUE etc.) */
-  const SECTION_KEYWORDS = ['hdfc', 'neft', 'hold', 'cheque', 'chq'];
+  const SECTION_KEYWORDS = ['hdfc', 'neft', 'hold', 'cheque', 'chq', 'others', 'other'];
 
   /* ── Rows to skip (totals, cancelled, nil, etc.) ─────────── */
   const SKIP_PATTERNS = [
