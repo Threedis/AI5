@@ -138,6 +138,18 @@ const Accounts = (() => {
         continue; // skip the section header row itself
       }
 
+      // Check if this row is a repeat column-header row (each section has its own header)
+      const rowHeaders = rawRow.map(v => String(v ?? ''));
+      const nonEmptyHdrs = rowHeaders.filter(h => h.trim().length > 1).length;
+      if (nonEmptyHdrs >= 3) {
+        const reMapped = mapColumns(rowHeaders);
+        if (reMapped.accountNo !== undefined || reMapped.empCode !== undefined) {
+          // Update colMap in case columns shifted, then skip this header row
+          colMap = reMapped;
+          continue;
+        }
+      }
+
       // Build a keyed object
       const obj = {};
       rawRow.forEach((v, idx) => { obj[idx] = v; });
