@@ -285,12 +285,12 @@
             </div>
           </div>
           <div class="card-body">
-            <div class="upload-zone" id="hr-upload-zone">
+            <label class="upload-zone" id="hr-upload-zone" for="hr-file-input">
               <div class="upload-icon"><i class="fa-solid fa-file-excel"></i></div>
               <h5>Drop HR Excel here or click to browse</h5>
               <p>Supports .xlsx and .xls — Max 50 MB — Multi-sheet workbooks supported</p>
-              <input type="file" id="hr-file-input" accept=".xlsx,.xls" style="display:none">
-            </div>
+            </label>
+            <input type="file" id="hr-file-input" accept=".xlsx,.xls" style="display:none">
 
             <!-- File info card (shown after selection) -->
             <div id="hr-file-info" style="display:none;margin-top:16px">
@@ -674,11 +674,6 @@
   const zone      = document.getElementById('hr-upload-zone');
   const fileInput = document.getElementById('hr-file-input');
 
-  zone.addEventListener('click', e => {
-    /* Prevent click triggered by the file input itself from re-opening the dialog */
-    if (e.target === fileInput) return;
-    fileInput.click();
-  });
   zone.addEventListener('dragover',  e   => { e.preventDefault(); zone.classList.add('dragover'); });
   zone.addEventListener('dragleave', ()  => zone.classList.remove('dragover'));
   zone.addEventListener('drop',      e   => {
