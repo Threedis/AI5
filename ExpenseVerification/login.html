@@ -244,7 +244,9 @@
 
   /* ── Redirect if already logged in ─────────────────────── */
   if (Auth.isLoggedIn()) {
-    window.location.href = 'dashboard.html';
+    const sess = Auth.getCurrentUser();
+    const rolePages = { admin: 'admin.html', hr: 'hr.html', accounts: 'accounts.html', user: 'user.html' };
+    window.location.href = rolePages[sess?.role] || 'dashboard.html';
     return;
   }
 
@@ -312,9 +314,12 @@
       Auth.saveSession(user, remember);
       await Audit.log({ module: 'Auth', action: 'Login', status: 'success', detail: `Logged in as ${user.role}` });
 
+      const rolePages = { admin: 'admin.html', hr: 'hr.html', accounts: 'accounts.html', user: 'user.html' };
+      const dest = rolePages[user.role] || 'dashboard.html';
+
       // Brief delay for UX
       await Utils.sleep(400);
-      window.location.href = 'dashboard.html';
+      window.location.href = dest;
 
     } catch (err) {
       console.error('[Login] Error:', err);

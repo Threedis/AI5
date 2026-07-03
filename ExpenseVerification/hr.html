@@ -668,7 +668,11 @@
   const zone      = document.getElementById('hr-upload-zone');
   const fileInput = document.getElementById('hr-file-input');
 
-  zone.addEventListener('click',     ()  => fileInput.click());
+  zone.addEventListener('click', e => {
+    /* Prevent click triggered by the file input itself from re-opening the dialog */
+    if (e.target === fileInput) return;
+    fileInput.click();
+  });
   zone.addEventListener('dragover',  e   => { e.preventDefault(); zone.classList.add('dragover'); });
   zone.addEventListener('dragleave', ()  => zone.classList.remove('dragover'));
   zone.addEventListener('drop',      e   => {

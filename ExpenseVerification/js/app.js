@@ -214,12 +214,22 @@ const App = (() => {
   /* ── Tabs ───────────────────────────────────────────────── */
   function initTabs(container = document) {
     container.querySelectorAll('.tabs-nav .tab-btn').forEach(btn => {
+      if (btn._tabInited) return;
+      btn._tabInited = true;
       btn.addEventListener('click', () => {
         const group = btn.closest('[data-tab-group]') || btn.closest('.tabs-nav').parentElement;
-        group.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-        group.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+        /* Only act on buttons/panes that are direct children of this group,
+           not those belonging to nested tab groups inside it. */
+        const directBtns  = Array.from(group.querySelectorAll('.tab-btn')).filter(
+          b => b.closest('[data-tab-group]') === group || b.closest('.tabs-nav').parentElement === group
+        );
+        const directPanes = Array.from(group.children).filter(el => el.classList.contains('tab-pane'));
+        directBtns.forEach(b => b.classList.remove('active'));
+        directPanes.forEach(p => p.classList.remove('active'));
         btn.classList.add('active');
-        const pane = group.querySelector(`[data-tab="${btn.dataset.tab}"]`);
+        const pane = Array.from(group.children).find(
+          el => el.classList.contains('tab-pane') && el.dataset.tab === btn.dataset.tab
+        );
         pane?.classList.add('active');
       });
     });
