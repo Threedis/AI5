@@ -186,47 +186,105 @@
       <div class="tab-pane active" data-tab="pdf">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
 
-          <!-- Upload panel -->
+          <!-- Upload / Lookup panel -->
           <div class="card">
             <div class="card-header">
-              <div class="card-title"><i class="fa-solid fa-file-pdf" style="color:var(--accent-red)"></i> Zoho Task Approval PDF</div>
+              <div class="card-title"><i class="fa-solid fa-search"></i> Approval Source</div>
             </div>
-            <div class="card-body">
-              <div class="upload-zone" id="pdf-zone" tabindex="0" aria-label="PDF upload zone">
-                <div class="upload-icon"><i class="fa-solid fa-file-pdf" style="color:var(--accent-red)"></i></div>
-                <h5>Drop Approval PDF here</h5>
-                <p>Zoho Task Approval document (.pdf)</p>
-                <button class="btn btn-outline btn-sm" onclick="document.getElementById('pdf-input').click()" style="margin-top:10px">
-                  <i class="fa-solid fa-folder-open"></i> Browse
+            <div class="card-body" style="padding-bottom:14px">
+
+              <!-- Mode toggle -->
+              <div style="display:flex;gap:0;margin-bottom:16px;border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden">
+                <button id="btn-mode-zoho" style="flex:1;padding:8px 12px;border:none;background:var(--primary);color:#fff;font-weight:600;font-size:.85rem;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
+                  <i class="fa-solid fa-link"></i> Zoho Task ID
                 </button>
-                <input type="file" id="pdf-input" accept=".pdf" style="display:none">
+                <button id="btn-mode-pdf" style="flex:1;padding:8px 12px;border:none;background:var(--bg-card);color:var(--text-secondary);font-weight:600;font-size:.85rem;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;border-left:1px solid var(--border)">
+                  <i class="fa-solid fa-file-pdf" style="color:var(--accent-red)"></i> Expense PDF
+                </button>
               </div>
 
-              <!-- File info -->
-              <div id="pdf-file-info" style="display:none;margin-top:14px;padding:12px 16px;background:var(--bg);border-radius:var(--radius-sm);border:1px solid var(--border)">
-                <div style="display:flex;align-items:center;gap:10px">
-                  <i class="fa-solid fa-file-pdf" style="color:var(--accent-red);font-size:1.4rem;flex-shrink:0"></i>
-                  <div style="flex:1;min-width:0">
-                    <div id="pdf-name" style="font-weight:600;font-size:.875rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></div>
-                    <div id="pdf-size" style="font-size:.75rem;color:var(--text-muted)"></div>
+              <!-- ── Zoho Task ID panel ── -->
+              <div id="zoho-panel">
+                <div style="display:flex;gap:8px;margin-bottom:12px">
+                  <input type="text" id="zoho-task-id" class="form-control" placeholder="Enter Zoho Task ID…" style="flex:1;font-family:var(--font-mono)">
+                  <button class="btn btn-primary" id="btn-zoho-search">
+                    <i class="fa-solid fa-magnifying-glass"></i> Search
+                  </button>
+                </div>
+                <div id="zoho-search-status" style="display:none;font-size:.8rem;color:var(--text-muted);margin-bottom:10px;padding:6px 10px;background:var(--bg);border-radius:var(--radius-sm);border:1px solid var(--border)"></div>
+
+                <!-- Collapsible Zoho settings -->
+                <div style="border:1px solid var(--border);border-radius:var(--radius-sm)">
+                  <button id="btn-zoho-settings-toggle" style="width:100%;background:none;border:none;padding:10px 14px;text-align:left;cursor:pointer;display:flex;align-items:center;gap:8px;font-size:.82rem;color:var(--text-secondary)">
+                    <i class="fa-solid fa-gear"></i> Zoho API Settings
+                    <i class="fa-solid fa-chevron-down" id="zoho-settings-chevron" style="margin-left:auto;font-size:.72rem;transition:transform .2s"></i>
+                  </button>
+                  <div id="zoho-settings-panel" style="display:none;padding:14px;border-top:1px solid var(--border)">
+                    <div style="display:flex;flex-direction:column;gap:10px">
+                      <div>
+                        <label style="font-size:.78rem;font-weight:600;color:var(--text-muted);display:block;margin-bottom:4px">Portal ID <span style="color:var(--accent-red)">*</span></label>
+                        <input type="text" id="zoho-portal-id" class="form-control" placeholder="e.g. threedis or portal_id number">
+                      </div>
+                      <div>
+                        <label style="font-size:.78rem;font-weight:600;color:var(--text-muted);display:block;margin-bottom:4px">Project ID <span style="font-weight:400;color:var(--text-muted)">(optional)</span></label>
+                        <input type="text" id="zoho-project-id" class="form-control" placeholder="e.g. 123456789 — leave blank to search all projects">
+                      </div>
+                      <div>
+                        <label style="font-size:.78rem;font-weight:600;color:var(--text-muted);display:block;margin-bottom:4px">Access Token <span style="color:var(--accent-red)">*</span></label>
+                        <input type="password" id="zoho-access-token" class="form-control" placeholder="Zoho OAuth access token">
+                      </div>
+                      <div style="display:flex;gap:8px">
+                        <button class="btn btn-outline btn-sm" id="btn-zoho-save-config" style="flex:1">
+                          <i class="fa-solid fa-floppy-disk"></i> Save Settings
+                        </button>
+                        <button class="btn btn-ghost btn-sm" id="btn-zoho-clear-config">
+                          <i class="fa-solid fa-trash"></i>
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                  <button class="btn btn-ghost btn-sm btn-icon" id="btn-clear-pdf" title="Remove PDF"><i class="fa-solid fa-xmark"></i></button>
                 </div>
               </div>
 
-              <!-- Extract progress -->
-              <div id="pdf-progress" style="display:none;margin-top:14px">
-                <div class="progress-bar-wrap">
-                  <div class="progress-bar-fill" id="pdf-progress-fill" style="width:0%"></div>
+              <!-- ── PDF panel ── -->
+              <div id="pdf-panel" style="display:none">
+                <div class="upload-zone" id="pdf-zone" tabindex="0" aria-label="PDF upload zone">
+                  <div class="upload-icon"><i class="fa-solid fa-file-pdf" style="color:var(--accent-red)"></i></div>
+                  <h5>Drop Approval PDF here</h5>
+                  <p>Zoho Task Approval document (.pdf)</p>
+                  <button class="btn btn-outline btn-sm" onclick="document.getElementById('pdf-input').click()" style="margin-top:10px">
+                    <i class="fa-solid fa-folder-open"></i> Browse
+                  </button>
+                  <input type="file" id="pdf-input" accept=".pdf" style="display:none">
                 </div>
-                <div class="progress-label" id="pdf-progress-label">Extracting text…</div>
+
+                <!-- File info -->
+                <div id="pdf-file-info" style="display:none;margin-top:14px;padding:12px 16px;background:var(--bg);border-radius:var(--radius-sm);border:1px solid var(--border)">
+                  <div style="display:flex;align-items:center;gap:10px">
+                    <i class="fa-solid fa-file-pdf" style="color:var(--accent-red);font-size:1.4rem;flex-shrink:0"></i>
+                    <div style="flex:1;min-width:0">
+                      <div id="pdf-name" style="font-weight:600;font-size:.875rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></div>
+                      <div id="pdf-size" style="font-size:.75rem;color:var(--text-muted)"></div>
+                    </div>
+                    <button class="btn btn-ghost btn-sm btn-icon" id="btn-clear-pdf" title="Remove PDF"><i class="fa-solid fa-xmark"></i></button>
+                  </div>
+                </div>
+
+                <!-- Extract progress -->
+                <div id="pdf-progress" style="display:none;margin-top:14px">
+                  <div class="progress-bar-wrap">
+                    <div class="progress-bar-fill" id="pdf-progress-fill" style="width:0%"></div>
+                  </div>
+                  <div class="progress-label" id="pdf-progress-label">Extracting text…</div>
+                </div>
+
+                <div style="margin-top:16px;display:flex;gap:10px">
+                  <button class="btn btn-primary" id="btn-extract" disabled style="flex:1;justify-content:center">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i> Extract &amp; Verify
+                  </button>
+                </div>
               </div>
 
-              <div style="margin-top:16px;display:flex;gap:10px">
-                <button class="btn btn-primary" id="btn-extract" disabled style="flex:1;justify-content:center">
-                  <i class="fa-solid fa-wand-magic-sparkles"></i> Extract &amp; Verify
-                </button>
-              </div>
             </div>
           </div>
 
@@ -238,8 +296,8 @@
             <div class="card-body" id="approval-panel">
               <div class="empty-state" style="padding:30px 0">
                 <div class="empty-icon"><i class="fa-solid fa-file-circle-question"></i></div>
-                <h5>No PDF uploaded</h5>
-                <p>Upload an approval PDF to see extracted data</p>
+                <h5>No approval loaded</h5>
+                <p>Search a Zoho Task ID or upload an approval PDF</p>
               </div>
             </div>
           </div>
@@ -249,12 +307,12 @@
         <div id="pdf-verify-section" style="display:none;margin-top:20px">
           <div class="card">
             <div class="card-header">
-              <div class="card-title"><i class="fa-solid fa-list-check"></i> Employees in this Approval</div>
+              <div class="card-title"><i class="fa-solid fa-list-check"></i> Employees in Approval</div>
               <span class="badge badge-blue" id="pdf-emp-count">0 emp IDs</span>
             </div>
             <div class="table-wrap" style="max-height:250px;overflow-y:auto">
               <table class="data-table">
-                <thead><tr><th>Emp ID (from PDF)</th><th>HR Record Found</th><th>Accounts Record Found</th><th>Quick Status</th></tr></thead>
+                <thead><tr><th>Emp ID</th><th>HR Record Found</th><th>Accounts Record Found</th><th>Quick Status</th></tr></thead>
                 <tbody id="pdf-emp-tbody"></tbody>
               </table>
             </div>
@@ -451,6 +509,7 @@
 <script src="js/hr.js"></script>
 <script src="js/accounts.js"></script>
 <script src="js/pdf-extract.js"></script>
+<script src="js/zoho-integration.js"></script>
 <script src="js/verification.js"></script>
 
 <script>
@@ -498,6 +557,118 @@
   let searchResults = [];
 
   /* ══════════════════════════════════════════════════════════
+     APPROVAL SOURCE MODE TOGGLE
+  ══════════════════════════════════════════════════════════ */
+  let approvalMode = 'zoho'; // 'zoho' | 'pdf'
+  let zohoTask = null; // parsed Zoho task
+
+  const btnModeZoho = document.getElementById('btn-mode-zoho');
+  const btnModePdf  = document.getElementById('btn-mode-pdf');
+  const zohoPanelEl = document.getElementById('zoho-panel');
+  const pdfPanelEl  = document.getElementById('pdf-panel');
+
+  function setApprovalMode(mode) {
+    approvalMode = mode;
+    const isZoho = mode === 'zoho';
+    btnModeZoho.style.background  = isZoho ? 'var(--primary)' : 'var(--bg-card)';
+    btnModeZoho.style.color       = isZoho ? '#fff' : 'var(--text-secondary)';
+    btnModePdf.style.background   = isZoho ? 'var(--bg-card)' : 'var(--primary)';
+    btnModePdf.style.color        = isZoho ? 'var(--text-secondary)' : '#fff';
+    zohoPanelEl.style.display     = isZoho ? '' : 'none';
+    pdfPanelEl.style.display      = isZoho ? 'none' : '';
+  }
+
+  btnModeZoho.addEventListener('click', () => setApprovalMode('zoho'));
+  btnModePdf.addEventListener('click',  () => setApprovalMode('pdf'));
+
+  /* ── Zoho Settings toggle ───────────────────────────────── */
+  const zohoSettingsPanel   = document.getElementById('zoho-settings-panel');
+  const zohoSettingsChevron = document.getElementById('zoho-settings-chevron');
+
+  document.getElementById('btn-zoho-settings-toggle').addEventListener('click', () => {
+    const open = zohoSettingsPanel.style.display === 'none';
+    zohoSettingsPanel.style.display    = open ? '' : 'none';
+    zohoSettingsChevron.style.transform = open ? 'rotate(180deg)' : '';
+  });
+
+  // Pre-fill settings from saved config
+  (function loadZohoConfig() {
+    const cfg = ZohoProjects.getConfig();
+    if (cfg.portalId)     document.getElementById('zoho-portal-id').value    = cfg.portalId;
+    if (cfg.projectId)    document.getElementById('zoho-project-id').value   = cfg.projectId;
+    if (cfg.accessToken)  document.getElementById('zoho-access-token').value = cfg.accessToken;
+  })();
+
+  document.getElementById('btn-zoho-save-config').addEventListener('click', () => {
+    const portalId    = document.getElementById('zoho-portal-id').value.trim();
+    const projectId   = document.getElementById('zoho-project-id').value.trim();
+    const accessToken = document.getElementById('zoho-access-token').value.trim();
+    if (!portalId || !accessToken) {
+      App.Toast.warning('Missing Fields', 'Portal ID and Access Token are required.');
+      return;
+    }
+    ZohoProjects.saveConfig({ portalId, projectId: projectId || '', accessToken });
+    App.Toast.success('Saved', 'Zoho API settings saved.');
+    zohoSettingsPanel.style.display    = 'none';
+    zohoSettingsChevron.style.transform = '';
+  });
+
+  document.getElementById('btn-zoho-clear-config').addEventListener('click', async () => {
+    const ok = await App.Modal.confirm({ title: 'Clear Zoho Settings', message: 'Remove saved Zoho API credentials?', confirmText: 'Clear', confirmClass: 'btn-danger' });
+    if (!ok) return;
+    ZohoProjects.saveConfig({ portalId: '', projectId: '', accessToken: '' });
+    document.getElementById('zoho-portal-id').value    = '';
+    document.getElementById('zoho-project-id').value   = '';
+    document.getElementById('zoho-access-token').value = '';
+    App.Toast.success('Cleared', 'Zoho settings removed.');
+  });
+
+  /* ── Zoho Task Search ───────────────────────────────────── */
+  async function doZohoSearch() {
+    const taskId = document.getElementById('zoho-task-id').value.trim();
+    if (!taskId) { App.Toast.warning('Task ID', 'Enter a Zoho Task ID.'); return; }
+
+    if (!ZohoProjects.isConfigured()) {
+      App.Toast.warning('Not Configured', 'Open Zoho API Settings and save your Portal ID and Access Token.');
+      document.getElementById('zoho-settings-panel').style.display = '';
+      zohoSettingsChevron.style.transform = 'rotate(180deg)';
+      return;
+    }
+
+    const statusEl = document.getElementById('zoho-search-status');
+    statusEl.style.display  = '';
+    statusEl.textContent    = 'Searching Zoho Projects…';
+    document.getElementById('btn-zoho-search').disabled = true;
+
+    try {
+      zohoTask = await ZohoProjects.fetchTask(taskId);
+      statusEl.textContent = ZohoProjects.getSummary(zohoTask);
+
+      renderApprovalPanel(zohoTask, 'zoho');
+      await renderPdfEmpTable({ empIds: zohoTask.empIds, source: 'zoho' });
+
+      if (zohoTask.empIds.length) {
+        document.getElementById('pdf-verify-section').style.display = 'block';
+        document.getElementById('pdf-emp-count').textContent = `${zohoTask.empIds.length} emp ID(s)`;
+      }
+
+      App.Toast.success('Task Found', ZohoProjects.getSummary(zohoTask));
+      await Audit.log({ module: 'Zoho', action: 'FetchTask', status: 'success', detail: `Task ${taskId}: ${zohoTask.approvalStatus}` });
+
+    } catch (err) {
+      statusEl.textContent = 'Error: ' + err.message;
+      statusEl.style.color = 'var(--accent-red)';
+      App.Toast.error('Zoho Search Failed', err.message);
+      await Audit.log({ module: 'Zoho', action: 'FetchTask', status: 'error', detail: err.message });
+    } finally {
+      document.getElementById('btn-zoho-search').disabled = false;
+    }
+  }
+
+  document.getElementById('btn-zoho-search').addEventListener('click', doZohoSearch);
+  document.getElementById('zoho-task-id').addEventListener('keydown', e => e.key === 'Enter' && doZohoSearch());
+
+  /* ══════════════════════════════════════════════════════════
      PDF UPLOAD
   ══════════════════════════════════════════════════════════ */
   const pdfZone  = document.getElementById('pdf-zone');
@@ -527,7 +698,7 @@
     document.getElementById('pdf-file-info').style.display  = 'none';
     document.getElementById('pdf-verify-section').style.display = 'none';
     document.getElementById('btn-extract').disabled = true;
-    renderApprovalPanel(null);
+    renderApprovalPanel(null, 'pdf');
   });
 
   /* ── Extract PDF ────────────────────────────────────────── */
@@ -550,7 +721,7 @@
       label.textContent = 'Done';
       setTimeout(() => { prog.style.display = 'none'; }, 600);
 
-      renderApprovalPanel(pdfParsed);
+      renderApprovalPanel(pdfParsed, 'pdf');
       await renderPdfEmpTable(pdfParsed);
 
       document.getElementById('pdf-verify-section').style.display = 'block';
@@ -565,12 +736,12 @@
   });
 
   /* ── Approval panel ─────────────────────────────────────── */
-  function renderApprovalPanel(parsed) {
+  function renderApprovalPanel(parsed, source) {
     const panel = document.getElementById('approval-panel');
     if (!parsed) {
       panel.innerHTML = `<div class="empty-state" style="padding:30px 0">
         <div class="empty-icon"><i class="fa-solid fa-file-circle-question"></i></div>
-        <h5>No PDF uploaded</h5><p>Upload an approval PDF to see extracted data</p>
+        <h5>No approval loaded</h5><p>Search a Zoho Task ID or upload an approval PDF</p>
       </div>`;
       return;
     }
@@ -579,30 +750,51 @@
     const statusIcon  = { approved:'fa-circle-check', rejected:'fa-circle-xmark', pending:'fa-clock', unknown:'fa-circle-question' }[parsed.approvalStatus] || 'fa-circle-question';
     const statusLabel = Utils.titleCase(parsed.approvalStatus);
 
+    // Normalise: Zoho task fields vs PDF fields
+    const isZoho     = source === 'zoho';
+    const taskRef    = isZoho ? parsed.taskId   : parsed.taskNo;
+    const taskLabel  = isZoho ? parsed.taskName : null;
+    const projectLbl = isZoho ? parsed.projectName : (parsed.department || null);
+    const submitter  = isZoho ? parsed.summaryProvider : null;
+    const assignees  = isZoho ? parsed.assignees : [];
+    const approvers  = parsed.approvers || [];
+    const empIds     = parsed.empIds || [];
+    const dates      = isZoho ? [] : (parsed.dates || []);
+    const amounts    = isZoho ? [] : (parsed.amounts || []);
+    const pageCount  = isZoho ? null : parsed.pageCount;
+    const taskStatus = isZoho ? parsed.status : null;
+
     panel.innerHTML = `
-      <div style="margin-bottom:16px">
+      <div style="margin-bottom:16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         <span class="approval-pill ${statusClass}">
           <i class="fa-solid ${statusIcon}"></i> ${statusLabel}
         </span>
+        <span style="font-size:.75rem;padding:3px 8px;border-radius:var(--radius-pill);background:var(--bg);border:1px solid var(--border);color:var(--text-muted)">
+          <i class="fa-solid ${isZoho ? 'fa-link' : 'fa-file-pdf'}"></i> ${isZoho ? 'Zoho Task' : 'PDF'}
+        </span>
       </div>
       <div style="display:flex;flex-direction:column;gap:10px">
-        ${parsed.taskNo ? `<div><div style="font-size:.75rem;color:var(--text-muted);font-weight:600">TASK / REFERENCE</div><div style="font-weight:600">${Utils.escapeHtml(parsed.taskNo)}</div></div>` : ''}
-        ${parsed.department ? `<div><div style="font-size:.75rem;color:var(--text-muted);font-weight:600">DEPARTMENT</div><div>${Utils.escapeHtml(parsed.department)}</div></div>` : ''}
-        ${parsed.approvers.length ? `<div><div style="font-size:.75rem;color:var(--text-muted);font-weight:600">APPROVED BY</div><div>${parsed.approvers.map(a => Utils.escapeHtml(a)).join(', ')}</div></div>` : ''}
-        ${parsed.dates.length ? `<div><div style="font-size:.75rem;color:var(--text-muted);font-weight:600">DATES FOUND</div><div style="font-size:.8rem">${parsed.dates.map(d => Utils.escapeHtml(d)).join(' · ')}</div></div>` : ''}
-        ${parsed.amounts.length ? `<div><div style="font-size:.75rem;color:var(--text-muted);font-weight:600">AMOUNTS FOUND</div><div style="font-size:.8rem">${parsed.amounts.map(a => Utils.formatCurrency(a)).join(' · ')}</div></div>` : ''}
-        <div><div style="font-size:.75rem;color:var(--text-muted);font-weight:600">PAGES</div><div>${parsed.pageCount}</div></div>
+        ${taskRef    ? `<div><div style="font-size:.75rem;color:var(--text-muted);font-weight:600">TASK / REFERENCE</div><div style="font-weight:600;font-family:var(--font-mono)">${Utils.escapeHtml(taskRef)}</div></div>` : ''}
+        ${taskLabel  ? `<div><div style="font-size:.75rem;color:var(--text-muted);font-weight:600">TASK NAME</div><div>${Utils.escapeHtml(taskLabel)}</div></div>` : ''}
+        ${projectLbl ? `<div><div style="font-size:.75rem;color:var(--text-muted);font-weight:600">${isZoho ? 'PROJECT' : 'DEPARTMENT'}</div><div>${Utils.escapeHtml(projectLbl)}</div></div>` : ''}
+        ${taskStatus ? `<div><div style="font-size:.75rem;color:var(--text-muted);font-weight:600">ZOHO STATUS</div><div>${Utils.escapeHtml(taskStatus)}</div></div>` : ''}
+        ${submitter  ? `<div><div style="font-size:.75rem;color:var(--text-muted);font-weight:600">SUBMITTED BY</div><div>${Utils.escapeHtml(submitter)}</div></div>` : ''}
+        ${approvers.length ? `<div><div style="font-size:.75rem;color:var(--text-muted);font-weight:600">APPROVED BY</div><div>${approvers.map(a => Utils.escapeHtml(a)).join(', ')}</div></div>` : ''}
+        ${assignees.length ? `<div><div style="font-size:.75rem;color:var(--text-muted);font-weight:600">ASSIGNEES</div><div style="font-size:.82rem">${assignees.map(a => Utils.escapeHtml(a)).join(', ')}</div></div>` : ''}
+        ${dates.length  ? `<div><div style="font-size:.75rem;color:var(--text-muted);font-weight:600">DATES FOUND</div><div style="font-size:.8rem">${dates.map(d => Utils.escapeHtml(d)).join(' · ')}</div></div>` : ''}
+        ${amounts.length ? `<div><div style="font-size:.75rem;color:var(--text-muted);font-weight:600">AMOUNTS FOUND</div><div style="font-size:.8rem">${amounts.map(a => Utils.formatCurrency(a)).join(' · ')}</div></div>` : ''}
+        ${pageCount != null ? `<div><div style="font-size:.75rem;color:var(--text-muted);font-weight:600">PAGES</div><div>${pageCount}</div></div>` : ''}
         <div><div style="font-size:.75rem;color:var(--text-muted);font-weight:600">EMP IDs DETECTED</div>
           <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">
-            ${parsed.empIds.length
-              ? parsed.empIds.map(id => `<span class="badge badge-blue">${Utils.escapeHtml(id)}</span>`).join('')
+            ${empIds.length
+              ? empIds.map(id => `<span class="badge badge-blue">${Utils.escapeHtml(id)}</span>`).join('')
               : '<span style="font-size:.8rem;color:var(--text-muted)">None detected</span>'}
           </div>
         </div>
       </div>`;
   }
 
-  /* ── PDF emp quick-check table ──────────────────────────── */
+  /* ── Emp quick-check table (used by both Zoho and PDF) ──── */
   async function renderPdfEmpTable(parsed) {
     const hrAll  = await Database.getAll('hrMaster');
     const accAll = await Database.getAll('accountsMaster');
@@ -610,15 +802,16 @@
     const hrMap  = new Map(hrAll.map(r  => [r.employeeId?.toUpperCase(), r]));
     const accMap = new Map(accAll.map(r => [r.empCode?.toUpperCase(), r]));
 
-    document.getElementById('pdf-emp-count').textContent = `${parsed.empIds.length} emp ID(s)`;
+    const empIds = parsed.empIds || [];
+    document.getElementById('pdf-emp-count').textContent = `${empIds.length} emp ID(s)`;
 
     const tbody = document.getElementById('pdf-emp-tbody');
-    if (!parsed.empIds.length) {
-      tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:30px;color:var(--text-muted)">No employee IDs detected in this PDF</td></tr>';
+    if (!empIds.length) {
+      tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:30px;color:var(--text-muted)">No employee IDs detected</td></tr>';
       return;
     }
 
-    tbody.innerHTML = parsed.empIds.map(id => {
+    tbody.innerHTML = empIds.map(id => {
       const hrRec  = hrMap.get(id.toUpperCase());
       const accRec = accMap.get(id.toUpperCase());
       const hrBadge  = hrRec  ? '<span class="badge badge-green"><i class="fa-solid fa-check"></i> Found</span>'  : '<span class="badge badge-red"><i class="fa-solid fa-xmark"></i> Missing</span>';
@@ -635,10 +828,19 @@
     }).join('');
   }
 
-  /* ── Run verification for PDF emp IDs ───────────────────── */
+  /* ── Run verification for approval emp IDs ───────────────── */
   document.getElementById('btn-verify-from-pdf').addEventListener('click', async () => {
-    if (!pdfParsed) return;
-    await runVerification({ filterEmpIds: pdfParsed.empIds.length ? pdfParsed.empIds : null, source: 'pdf', pdfFile: pdfParsed.fileName });
+    let empIds = [], src = 'pdf', fileName = null;
+    if (approvalMode === 'zoho' && zohoTask) {
+      empIds   = zohoTask.empIds;
+      src      = 'zoho';
+      fileName = `Zoho Task ${zohoTask.taskId}`;
+    } else if (pdfParsed) {
+      empIds   = pdfParsed.empIds;
+      fileName = pdfParsed.fileName;
+    }
+    if (!empIds.length && !pdfParsed && !zohoTask) return;
+    await runVerification({ filterEmpIds: empIds.length ? empIds : null, source: src, pdfFile: fileName });
     document.querySelector('.tab-btn[data-tab="verify"]').click();
   });
 
@@ -878,7 +1080,9 @@
         const sum = s.summary || {};
         const srcIcon = s.source === 'pdf'
           ? '<i class="fa-solid fa-file-pdf" style="color:var(--accent-red)"></i>'
-          : '<i class="fa-solid fa-play" style="color:var(--primary)"></i>';
+          : s.source === 'zoho'
+            ? '<i class="fa-solid fa-link" style="color:var(--primary)"></i>'
+            : '<i class="fa-solid fa-play" style="color:var(--primary)"></i>';
         return `
           <div class="session-item" onclick="loadSession('${s.id}')">
             <div class="si-icon">${srcIcon}</div>
@@ -1007,6 +1211,9 @@
     document.getElementById('global-emp-search').value = urlSearch;
     await doSearch();
   }
+
+  /* ── Initial mode ───────────────────────────────────────── */
+  setApprovalMode('zoho');
 
   /* ── Initial load ───────────────────────────────────────── */
   await loadHistory();
