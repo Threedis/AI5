@@ -64,9 +64,7 @@ const HR = (() => {
           const nonEmpty = cells.filter(c => c !== '');
 
           const hasSummaryKeyword = lower.some(c =>
-            /\btotal\b|\bcount\b|group\s*count|record\s*count|no\.\s*of\s*(emp|rec|row)|
-             ^sr\.?\s*no\.?$|^s\.?\s*no\.?$|^serial\s*no\.?$|
-             \bsummary\b|\bsubtotal\b|\bgrand\s*total\b/ix.test(c)
+            /\btotal\b|\bcount\b|group\s*count|record\s*count|no\.\s*of\s*(emp|rec|row)|^sr\.?\s*no\.?$|^s\.?\s*no\.?$|^serial\s*no\.?$|\bsummary\b|\bsubtotal\b|\bgrand\s*total\b/i.test(c)
           );
 
           /* Key fields blank + row has ≤3 non-empty cells, one of which is purely numeric */
