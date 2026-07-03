@@ -127,30 +127,45 @@ const Accounts = (() => {
     // Parse data rows after header
     const records = [];
     let currentSection = '';
+    let skipNextNonBlank = false; // set after section header to skip its column-header row
 
     for (let i = headerIdx + 1; i < rows.length; i++) {
       const rawRow = rows[i];
+
+      // Skip blank rows early
+      const allCellVals = rawRow.map(v => String(v ?? '').trim()).filter(Boolean);
+      if (allCellVals.length === 0) continue;
 
       // Check if this row is a section header (HDFC / NEFT / HOLD / CHEQUE)
       const section = detectSection(rawRow);
       if (section !== null) {
         currentSection = section;
-        continue; // skip the section header row itself
+        skipNextNonBlank = true; // the next non-blank row is the column-header for this section
+        continue;
       }
 
-      // Check if this row is a repeat column-header row (each section has its own header)
-      const rowHeaders = rawRow.map(v => String(v ?? ''));
-      const nonEmptyHdrs = rowHeaders.filter(h => h.trim().length > 1).length;
-      if (nonEmptyHdrs >= 3) {
+      // Skip the column-header row that follows each section header
+      if (skipNextNonBlank) {
+        skipNextNonBlank = false;
+        const rowHeaders = rawRow.map(v => String(v ?? ''));
         const reMapped = mapColumns(rowHeaders);
-        if (reMapped.accountNo !== undefined || reMapped.empCode !== undefined) {
-          // Update colMap in case columns shifted, then skip this header row
-          colMap = reMapped;
+        // Update colMap if this row really is a header, then skip it
+        if (Object.keys(reMapped).length >= 2) colMap = reMapped;
+        continue; // always skip the row immediately after a section header
+      }
+
+      // Also skip any other repeat header rows (safety net)
+      const rowHeaders2 = rawRow.map(v => String(v ?? ''));
+      const nonEmptyHdrs = rowHeaders2.filter(h => h.trim().length > 1).length;
+      if (nonEmptyHdrs >= 3) {
+        const reMapped2 = mapColumns(rowHeaders2);
+        if (reMapped2.accountNo !== undefined || reMapped2.empCode !== undefined) {
+          colMap = reMapped2;
           continue;
         }
       }
 
-      // Build a keyed object
+      // Build keyed object for field extraction
       const obj = {};
       rawRow.forEach((v, idx) => { obj[idx] = v; });
 
