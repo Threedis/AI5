@@ -674,6 +674,10 @@
   box-shadow: var(--shadow-md);
   padding: 6px;
   z-index: 2000;
+  display: none;
+}
+.dropdown-menu.open {
+  display: block;
   animation: slideDown .18s var(--ease);
 }
 .dropdown-item {
