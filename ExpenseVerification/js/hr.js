@@ -20,7 +20,7 @@ const HR = (() => {
   };
 
   const REQUIRED_COLUMNS = ['employeeId','employeeName'];
-  const OPTIONAL_COLUMNS = ['month','year','branch','division','bankName','bankAccountNumber','ifsc','nameInBank'];
+  const OPTIONAL_COLUMNS = ['branch','division','bankName','bankAccountNumber','ifsc'];
 
   /* ── Parse SheetJS workbook to raw records ───────────────── */
   function parseSheet(workbook) {
