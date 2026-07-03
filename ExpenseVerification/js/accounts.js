@@ -14,7 +14,7 @@ const Accounts = (() => {
     empName:     ['emp name','empname','emp_name','employee name','employee_name','name','staff name'],
     bankName:    ['bank name','bankname','bank_name','bank','bank nm'],
     accountNo:   ['bank ac no','bank ac','account no','account number','account_no','accountno',
-                  'acc no','acc_no','ac no','acno','bank account','bank account no'],
+                  'acc no','acc_no','ac no','acno','bank account','bank account no','bankacno'],
     netPay:      ['netpay','net pay','net_pay','net amount','net salary','amount','salary',
                   'net sal','sal amount'],
     pan:         ['pan','pan no','pan number','pan_no','pan card','pancard'],
@@ -26,10 +26,12 @@ const Accounts = (() => {
     location:    ['location','branch','office','city'],
   };
 
-  /* ── Rows to skip (Cheque, HOLD, Cancelled, subtotals) ───── */
+  /* ── Section header keywords (HDFC, NEFT, HOLD, CHEQUE etc.) */
+  const SECTION_KEYWORDS = ['hdfc', 'neft', 'hold', 'cheque', 'chq'];
+
+  /* ── Rows to skip (totals, cancelled, nil, etc.) ─────────── */
   const SKIP_PATTERNS = [
-    /^cheque$/i, /^chq$/i, /\bcheque\b/i, /\bchq\b/i,
-    /\bhold\b/i, /\bcancelled?\b/i, /\bcanceled\b/i,
+    /\bcancelled?\b/i, /\bcanceled\b/i,
     /\btotal\b/i, /^grand total/i, /^sub.?total/i,
     /\bnil\b/i,
   ];
@@ -53,22 +55,35 @@ const Accounts = (() => {
     return map;
   }
 
-  /* ── Detect if a row looks like a section header / blank ─── */
-  function isSectionHeader(row, colMap) {
-    // Blank row
+  /* ── Detect if a row is a named section header (HDFC/NEFT/HOLD/CHEQUE) */
+  function detectSection(rawRow) {
+    const allVals = rawRow.map(v => String(v ?? '').trim().toLowerCase()).filter(Boolean);
+    if (allVals.length === 0) return null; // blank row, not a section header
+    // A section header row has very few non-empty cells and one matches a keyword
+    const nonEmpty = allVals.filter(v => v.length > 0);
+    if (nonEmpty.length <= 3) {
+      for (const kw of SECTION_KEYWORDS) {
+        if (nonEmpty.some(v => v === kw || v.startsWith(kw + ' ') || v.endsWith(' ' + kw))) {
+          return kw.toUpperCase();
+        }
+      }
+    }
+    return null;
+  }
+
+  /* ── Detect if a row should be skipped (blank / totals / etc.) */
+  function shouldSkipRow(row, colMap) {
     const vals = Object.values(row).filter(v => v !== null && v !== undefined && String(v).trim() !== '');
     if (vals.length === 0) return true;
 
-    // Check skip patterns on empName or accountNo cells
-    const name   = String(row[colMap.empName]   ?? '').trim();
-    const accNo  = String(row[colMap.accountNo]  ?? '').trim();
-    const empCode = String(row[colMap.empCode]   ?? '').trim();
+    const name    = String(row[colMap.empName]  ?? '').trim();
+    const accNo   = String(row[colMap.accountNo] ?? '').trim();
+    const empCode = String(row[colMap.empCode]  ?? '').trim();
 
     for (const pat of SKIP_PATTERNS) {
       if (pat.test(name) || pat.test(accNo)) return true;
     }
 
-    // No account number AND no emp code → likely a section header row
     if (!accNo && !empCode) return true;
 
     return false;
@@ -111,14 +126,23 @@ const Accounts = (() => {
 
     // Parse data rows after header
     const records = [];
+    let currentSection = '';
+
     for (let i = headerIdx + 1; i < rows.length; i++) {
       const rawRow = rows[i];
+
+      // Check if this row is a section header (HDFC / NEFT / HOLD / CHEQUE)
+      const section = detectSection(rawRow);
+      if (section !== null) {
+        currentSection = section;
+        continue; // skip the section header row itself
+      }
 
       // Build a keyed object
       const obj = {};
       rawRow.forEach((v, idx) => { obj[idx] = v; });
 
-      if (isSectionHeader(obj, colMap)) continue;
+      if (shouldSkipRow(obj, colMap)) continue;
 
       // Extract fields
       const accountNo = String(obj[colMap.accountNo] ?? '').trim().replace(/[^0-9]/g, '');
@@ -140,6 +164,8 @@ const Accounts = (() => {
         department:  String(obj[colMap.department]   ?? '').trim(),
         designation: String(obj[colMap.designation]  ?? '').trim(),
         location:    String(obj[colMap.location]     ?? '').trim(),
+        section:     currentSection,
+        isHold:      currentSection === 'HOLD',
         _sheet:      sheetName,
         _row:        i + 1,
       };
@@ -230,6 +256,11 @@ const Accounts = (() => {
       // Bank name (optional)
       if (!rec.bankName) {
         warnings.push({ row: idx + 1, field: 'bankName', type: 'MISSING_BANK_NAME', message: 'Bank name not provided', value: '', rowLabel });
+      }
+
+      // HOLD section — payment is pending release
+      if (rec.isHold) {
+        warnings.push({ row: idx + 1, field: 'section', type: 'PAYMENT_ON_HOLD', message: 'Employee payment is in HOLD section — release is pending', value: rec.empName || rec.empCode, rowLabel });
       }
     });
 
@@ -434,6 +465,7 @@ const Accounts = (() => {
       { header: 'PAN',         key: 'pan',          width: 14 },
       { header: 'Name in Bank',key: 'nameInBank',   width: 28 },
       { header: 'Department',  key: 'department',   width: 18 },
+      { header: 'Section',     key: 'section',      width: 12 },
       { header: 'Sheet',       key: '_sheet',       width: 16 },
       { header: 'Source Row',  key: '_row',         width: 10 },
     ];
