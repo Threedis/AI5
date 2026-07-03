@@ -51,14 +51,24 @@ const HR = (() => {
         const row = rows[r];
         if (row.every(c => String(c).trim() === '')) continue; // blank row
 
-        /* The row immediately after the header with no Employee ID is a
-           group/count summary row — skip it so it never enters validation. */
-        if (r === headerRowIdx + 1) {
-          const empIdVal = colIdx.employeeId !== undefined
-            ? String(row[colIdx.employeeId] ?? '').trim()
-            : '';
-          if (!empIdVal) continue;
-        }
+        /* Skip group/count summary rows anywhere in the sheet.
+           Matches patterns like "Jun/2026 : 1477 Item(s)", "Total: 500",
+           "Group Count 200", etc. — any row where a cell contains a
+           record-count pattern AND the Employee ID column is blank. */
+        const empIdVal = colIdx.employeeId !== undefined
+          ? String(row[colIdx.employeeId] ?? '').trim()
+          : '';
+        const isSummaryRow = !empIdVal && row.some(c => {
+          const v = String(c ?? '').trim();
+          return /\d+\s*item\(s\)/i.test(v)           // "1477 Item(s)"
+            || /\bitem\(s\)\b/i.test(v)               // bare "Item(s)"
+            || /\btotal\b.*\d/i.test(v)               // "Total: 500"
+            || /\bcount\b.*\d/i.test(v)               // "Count: 200"
+            || /\bgroup\b.*\d/i.test(v)               // "Group 3: 150"
+            || /\d+\s*record/i.test(v)                // "150 Records"
+            || /[a-z]{3}\/\d{4}\s*:/i.test(v);       // "Jun/2026 :"
+        });
+        if (isSummaryRow) continue;
 
         const rec = {};
         for (const [field, idx] of Object.entries(colIdx)) {
