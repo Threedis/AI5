@@ -4,124 +4,130 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Admin — Employee Expense Verification</title>
-
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <link rel="stylesheet" href="css/theme.css">
   <link rel="stylesheet" href="css/components.css">
   <link rel="stylesheet" href="css/styles.css">
+  <style>
+    /* ── Backup progress panel ────────────────────────────── */
+    .backup-log { background:var(--bg); border:1px solid var(--border); border-radius:var(--radius-sm); padding:12px 16px; font-family:var(--font-mono); font-size:.78rem; max-height:160px; overflow-y:auto; margin-top:12px; display:none; }
+    .backup-log-line { padding:2px 0; color:var(--text-secondary); }
+    .backup-log-line.ok   { color:var(--accent-green); }
+    .backup-log-line.err  { color:var(--accent-red); }
+
+    /* ── Backup list items ───────────────────────────────── */
+    .backup-item {
+      display:flex; align-items:center; gap:12px; padding:10px 14px;
+      border:1px solid var(--border); border-radius:var(--radius-sm);
+      background:var(--bg-card); margin-bottom:8px;
+    }
+    .backup-item .bi-icon { width:36px;height:36px;border-radius:50%;background:var(--primary-xlight);color:var(--primary);display:flex;align-items:center;justify-content:center;flex-shrink:0; }
+    .backup-item .bi-info { flex:1;min-width:0; }
+    .backup-item .bi-name { font-weight:600;font-size:.825rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+    .backup-item .bi-meta { font-size:.72rem;color:var(--text-muted); }
+
+    /* ── Enc key indicator ───────────────────────────────── */
+    .key-strength { height:4px; border-radius:2px; margin-top:6px; transition:width .3s; }
+    .key-weak   { background:var(--accent-red); }
+    .key-ok     { background:var(--accent-yellow); }
+    .key-strong { background:var(--accent-green); }
+
+    /* ── Version type badges ─────────────────────────────── */
+    .ver-hr  { background:#EFF6FC; color:#005A9E; border:1px solid #C7E0F4; }
+    .ver-acc { background:#F0F9F0; color:#0A5F0A; border:1px solid #B3D9B3; }
+  </style>
 </head>
 <body>
 
-<!-- Header (same pattern as dashboard) -->
+<!-- ── Header ──────────────────────────────────────────────── -->
 <header class="app-header">
-  <button class="sidebar-toggle-btn"><i class="fa-solid fa-bars"></i></button>
+  <button class="sidebar-toggle-btn" aria-label="Toggle sidebar"><i class="fa-solid fa-bars"></i></button>
   <div class="brand">
     <div class="brand-icon"><i class="fa-solid fa-shield-check"></i></div>
-    <span>ExpenseVerify</span>
-    <span class="version-chip">v1.0</span>
+    <span>ExpenseVerify</span><span class="version-chip">v1.0</span>
   </div>
   <div class="header-search">
     <i class="fa-solid fa-magnifying-glass"></i>
-    <input type="text" placeholder="Search employees, accounts…">
+    <input type="text" id="global-search-input" placeholder="Search employees, accounts…" aria-label="Global search">
   </div>
   <div class="header-actions">
-    <button class="header-btn"><i class="fa-regular fa-bell"></i><span class="badge"></span></button>
+    <button class="header-btn" aria-label="Notifications"><i class="fa-regular fa-bell"></i></button>
     <div class="dropdown">
-      <div class="user-avatar" data-dropdown="user-menu">AD</div>
+      <div class="user-avatar" id="user-avatar" data-dropdown="user-menu">AD</div>
       <div class="dropdown-menu" id="user-menu">
-        <div style="padding:10px 14px 8px;border-bottom:1px solid var(--border);margin-bottom:6px;">
-          <div style="font-size:.85rem;font-weight:700;color:var(--text-primary)" id="dm-name">Administrator</div>
+        <div style="padding:10px 14px 8px;border-bottom:1px solid var(--border);margin-bottom:6px">
+          <div style="font-size:.85rem;font-weight:700" id="dm-name">Administrator</div>
           <div style="font-size:.75rem;color:var(--text-muted)" id="dm-role">System Administrator</div>
         </div>
-        <button class="dropdown-item" onclick="window.location.href='dashboard.html'">
-          <i class="fa-solid fa-chart-pie"></i> Dashboard
-        </button>
+        <button class="dropdown-item" onclick="location.href='dashboard.html'"><i class="fa-solid fa-chart-pie"></i> Dashboard</button>
         <div class="dropdown-divider"></div>
-        <button class="dropdown-item danger" data-action="logout">
-          <i class="fa-solid fa-right-from-bracket"></i> Sign Out
-        </button>
+        <button class="dropdown-item danger" data-action="logout"><i class="fa-solid fa-right-from-bracket"></i> Sign Out</button>
       </div>
     </div>
   </div>
 </header>
 
-<!-- Sidebar -->
-<aside class="app-sidebar">
+<!-- ── Sidebar ─────────────────────────────────────────────── -->
+<aside class="app-sidebar" id="app-sidebar">
   <nav class="sidebar-nav">
     <div class="nav-section-label">Main</div>
     <button class="nav-item" data-page="dashboard.html"><span class="nav-icon"><i class="fa-solid fa-chart-pie"></i></span><span class="nav-label">Dashboard</span></button>
-    <button class="nav-item" data-page="user.html"><span class="nav-icon"><i class="fa-solid fa-magnifying-glass"></i></span><span class="nav-label">Search</span></button>
-
     <div class="nav-section-label">Administration</div>
-    <button class="nav-item" data-page="admin.html"><span class="nav-icon"><i class="fa-solid fa-users-gear"></i></span><span class="nav-label">Admin Panel</span></button>
-
+    <button class="nav-item" data-page="admin.html"><span class="nav-icon"><i class="fa-solid fa-user-shield"></i></span><span class="nav-label">Admin Panel</span></button>
     <div class="nav-section-label">HR</div>
-    <button class="nav-item" data-page="hr.html"><span class="nav-icon"><i class="fa-solid fa-upload"></i></span><span class="nav-label">HR Data</span></button>
-
+    <button class="nav-item" data-page="hr.html"><span class="nav-icon"><i class="fa-solid fa-users"></i></span><span class="nav-label">HR Master</span></button>
     <div class="nav-section-label">Accounts</div>
-    <button class="nav-item" data-page="accounts.html"><span class="nav-icon"><i class="fa-solid fa-file-excel"></i></span><span class="nav-label">Bank Advice</span></button>
-
+    <button class="nav-item" data-page="accounts.html"><span class="nav-icon"><i class="fa-solid fa-file-invoice-dollar"></i></span><span class="nav-label">Bank Advice</span></button>
     <div class="nav-section-label">Verification</div>
     <button class="nav-item" data-page="user.html"><span class="nav-icon"><i class="fa-solid fa-shield-check"></i></span><span class="nav-label">Verification</span></button>
   </nav>
   <div class="sidebar-footer">
     <div class="sidebar-user">
-      <div class="s-avatar">AD</div>
+      <div class="s-avatar" id="sidebar-avatar">AD</div>
       <div class="s-info">
-        <div class="s-name">Administrator</div>
-        <div class="s-role">System Administrator</div>
+        <div class="s-name" id="sidebar-name">Administrator</div>
+        <div class="s-role" id="sidebar-role">System Administrator</div>
       </div>
     </div>
   </div>
 </aside>
-<div class="sidebar-overlay"></div>
+<div class="sidebar-overlay" id="sidebar-overlay"></div>
 
-<!-- Main -->
+<!-- ── Main ────────────────────────────────────────────────── -->
 <main class="app-main">
-  <div class="breadcrumb-bar">
-    <span class="bc-item"><i class="fa-solid fa-house"></i> Home</span>
-    <span class="bc-sep"><i class="fa-solid fa-chevron-right"></i></span>
-    <span class="bc-item"><a href="dashboard.html">Dashboard</a></span>
-    <span class="bc-sep"><i class="fa-solid fa-chevron-right"></i></span>
-    <span class="bc-item active">Administration</span>
-  </div>
+  <div class="breadcrumb-bar" id="breadcrumb-bar"></div>
 
   <div class="page-content">
     <div class="page-header">
       <div>
         <h1 class="page-title"><i class="fa-solid fa-shield-halved" style="color:var(--accent-purple)"></i> Administration</h1>
-        <p class="page-subtitle">Manage users, settings, audit logs, and backups</p>
+        <p class="page-subtitle">Manage users, audit logs, backups, and application settings</p>
       </div>
     </div>
 
-    <!-- Tabs -->
-    <div data-tab-group>
+    <div data-tab-group id="admin-tabs">
       <div class="tabs-nav">
         <button class="tab-btn active" data-tab="users"><i class="fa-solid fa-users"></i> Users</button>
         <button class="tab-btn" data-tab="audit"><i class="fa-solid fa-scroll"></i> Audit Logs</button>
         <button class="tab-btn" data-tab="backup"><i class="fa-solid fa-cloud-arrow-up"></i> Backup</button>
         <button class="tab-btn" data-tab="settings"><i class="fa-solid fa-sliders"></i> Settings</button>
-        <button class="tab-btn" data-tab="version"><i class="fa-solid fa-code-branch"></i> Versions</button>
+        <button class="tab-btn" data-tab="versions"><i class="fa-solid fa-code-branch"></i> Versions</button>
       </div>
 
-      <!-- Users Tab -->
+      <!-- ══════ Users Tab ════════════════════════════════════ -->
       <div class="tab-pane active" data-tab="users">
         <div class="card">
           <div class="card-header">
             <div class="card-title"><i class="fa-solid fa-users"></i> User Management</div>
-            <button class="btn btn-primary btn-sm" id="add-user-btn">
-              <i class="fa-solid fa-user-plus"></i> Add User
-            </button>
+            <button class="btn btn-primary btn-sm" id="add-user-btn"><i class="fa-solid fa-user-plus"></i> Add User</button>
           </div>
           <div class="table-toolbar">
             <div class="table-search">
               <i class="fa-solid fa-magnifying-glass"></i>
               <input type="text" id="user-search" placeholder="Search users…">
             </div>
-            <div style="margin-left:auto;display:flex;gap:8px">
-              <select class="form-control" id="role-filter" style="width:140px;padding:7px 10px;">
+            <div style="margin-left:auto">
+              <select class="form-control" id="role-filter" style="width:140px;padding:7px 10px">
                 <option value="">All Roles</option>
                 <option value="admin">Admin</option>
                 <option value="hr">HR</option>
@@ -130,201 +136,291 @@
               </select>
             </div>
           </div>
-          <div class="table-wrap">
-            <table class="data-table" id="users-table">
+          <div class="table-wrap" style="max-height:500px;overflow-y:auto">
+            <table class="data-table">
               <thead>
-                <tr>
-                  <th>Username</th>
-                  <th>Display Name</th>
-                  <th>Role</th>
-                  <th>Department</th>
-                  <th>Status</th>
-                  <th>Created</th>
-                  <th>Actions</th>
-                </tr>
+                <tr><th>Username</th><th>Display Name</th><th>Role</th><th>Department</th><th>Status</th><th>Created</th><th>Actions</th></tr>
               </thead>
               <tbody id="users-tbody">
-                <tr><td colspan="7" style="text-align:center;padding:40px;color:var(--text-muted)">
-                  <div class="spinner spinner-sm" style="margin:0 auto 10px;"></div>
-                  Loading users…
-                </td></tr>
+                <tr><td colspan="7" style="text-align:center;padding:40px;color:var(--text-muted)"><div class="spinner spinner-sm" style="margin:0 auto 10px"></div>Loading…</td></tr>
               </tbody>
             </table>
           </div>
         </div>
       </div>
 
-      <!-- Audit Tab -->
+      <!-- ══════ Audit Logs Tab ════════════════════════════════ -->
       <div class="tab-pane" data-tab="audit">
         <div class="card">
           <div class="card-header">
             <div class="card-title"><i class="fa-solid fa-scroll"></i> Audit Logs</div>
-            <button class="btn btn-ghost btn-sm" id="export-audit-btn">
-              <i class="fa-solid fa-download"></i> Export
-            </button>
-          </div>
-          <div class="table-toolbar">
-            <div class="table-search">
-              <i class="fa-solid fa-magnifying-glass"></i>
-              <input type="text" id="audit-search" placeholder="Search logs…">
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-outline btn-sm" id="export-audit-btn"><i class="fa-solid fa-file-arrow-down"></i> Export CSV</button>
+              <button class="btn btn-ghost btn-sm" id="prune-audit-btn"><i class="fa-solid fa-trash-can"></i> Prune Old</button>
             </div>
           </div>
-          <div class="table-wrap" style="max-height:520px;overflow-y:auto;">
+          <div class="table-toolbar">
+            <div class="table-search" style="flex:1">
+              <i class="fa-solid fa-magnifying-glass"></i>
+              <input type="text" id="audit-search" placeholder="Search by user, module, action…">
+            </div>
+            <select class="form-control" id="audit-module-filter" style="width:140px;padding:7px 10px">
+              <option value="">All Modules</option>
+              <option>HR</option><option>Accounts</option><option>Verification</option>
+              <option>Admin</option><option>Auth</option><option>Backup</option><option>PDF</option>
+            </select>
+            <select class="form-control" id="audit-status-filter" style="width:120px;padding:7px 10px">
+              <option value="">All Status</option>
+              <option value="success">Success</option>
+              <option value="error">Error</option>
+              <option value="warning">Warning</option>
+            </select>
+          </div>
+          <div class="table-wrap" style="max-height:520px;overflow-y:auto">
             <table class="data-table">
               <thead>
-                <tr>
-                  <th>Date & Time</th>
-                  <th>User</th>
-                  <th>Role</th>
-                  <th>Module</th>
-                  <th>Action</th>
-                  <th>Status</th>
-                  <th>Detail</th>
-                </tr>
+                <tr><th>Date &amp; Time</th><th>User</th><th>Role</th><th>Module</th><th>Action</th><th>Status</th><th>Detail</th></tr>
               </thead>
               <tbody id="audit-tbody">
-                <tr><td colspan="7" style="text-align:center;padding:40px;color:var(--text-muted)">
-                  Loading audit logs…
-                </td></tr>
+                <tr><td colspan="7" style="text-align:center;padding:40px;color:var(--text-muted)">Select Audit Logs tab to load</td></tr>
               </tbody>
             </table>
           </div>
+          <div style="padding:8px 16px;font-size:.75rem;color:var(--text-muted)" id="audit-count"></div>
         </div>
       </div>
 
-      <!-- Backup Tab -->
+      <!-- ══════ Backup Tab ════════════════════════════════════ -->
       <div class="tab-pane" data-tab="backup">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+
+          <!-- Push backup -->
           <div class="card">
             <div class="card-header">
               <div class="card-title"><i class="fa-solid fa-cloud-arrow-up"></i> GitHub Backup</div>
             </div>
             <div class="card-body">
               <p style="font-size:.875rem;color:var(--text-secondary);margin-bottom:16px">
-                Configure your GitHub repository to store encrypted backups.
-                No plain data is ever sent — only AES-256 encrypted JSON.
+                Encrypted AES-256 snapshots pushed to your GitHub repository.
+                No plain data ever leaves this device.
               </p>
+
               <div class="form-group">
                 <label class="form-label">GitHub Token (PAT)</label>
                 <div class="input-group">
                   <span class="input-icon"><i class="fa-brands fa-github"></i></span>
-                  <input type="password" class="form-control" id="gh-token" placeholder="ghp_…">
-                  <button class="input-addon" id="gh-token-toggle"><i class="fa-regular fa-eye"></i></button>
+                  <input type="password" class="form-control" id="gh-token" placeholder="ghp_…" autocomplete="off">
+                  <button class="input-addon" id="gh-token-toggle" type="button"><i class="fa-regular fa-eye"></i></button>
                 </div>
+                <span class="form-hint">Needs <code>repo</code> scope permission</span>
               </div>
+
               <div class="form-group">
-                <label class="form-label">Repository (owner/repo)</label>
-                <input type="text" class="form-control" id="gh-repo" placeholder="myorg/expense-db">
+                <label class="form-label">Repository</label>
+                <input type="text" class="form-control" id="gh-repo" placeholder="owner/repo-name">
               </div>
+
               <div class="form-group">
                 <label class="form-label">Branch</label>
                 <input type="text" class="form-control" id="gh-branch" value="main">
               </div>
+
               <div class="form-group">
-                <label class="form-label">Encryption Key (for backup)</label>
+                <label class="form-label">Backup Encryption Key</label>
                 <div class="input-group">
                   <span class="input-icon"><i class="fa-solid fa-key"></i></span>
-                  <input type="password" class="form-control" id="gh-enc-key" placeholder="Min 32 characters">
+                  <input type="password" class="form-control" id="gh-enc-key" placeholder="Min 16 characters" autocomplete="new-password" id="gh-enc-key">
                 </div>
-                <span class="form-hint">Store this key securely. Lost key = lost backup.</span>
+                <div class="key-strength" id="key-strength-bar" style="width:0%"></div>
+                <span class="form-hint">Store securely — lost key means lost backup access.</span>
               </div>
-              <div style="display:flex;gap:10px;flex-wrap:wrap">
-                <button class="btn btn-primary" id="save-gh-settings">
-                  <i class="fa-solid fa-floppy-disk"></i> Save Settings
-                </button>
-                <button class="btn btn-outline" id="test-gh-btn">
-                  <i class="fa-solid fa-plug"></i> Test Connection
-                </button>
+
+              <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:4px">
+                <button class="btn btn-primary" id="save-gh-btn"><i class="fa-solid fa-floppy-disk"></i> Save Settings</button>
+                <button class="btn btn-outline" id="test-gh-btn"><i class="fa-solid fa-plug"></i> Test Connection</button>
               </div>
+
+              <div style="border-top:1px solid var(--border);margin-top:20px;padding-top:16px">
+                <button class="btn btn-success" id="push-backup-btn" style="width:100%;justify-content:center">
+                  <i class="fa-solid fa-cloud-arrow-up"></i> Push Backup Now
+                </button>
+                <div class="backup-log" id="backup-push-log"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Restore -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title"><i class="fa-solid fa-cloud-arrow-down"></i> Restore &amp; Rollback</div>
+            </div>
+            <div class="card-body">
+              <p style="font-size:.875rem;color:var(--text-secondary);margin-bottom:16px">
+                Download an encrypted backup from GitHub and restore all data to IndexedDB.
+              </p>
+
+              <button class="btn btn-outline" id="fetch-backups-btn" style="margin-bottom:16px">
+                <i class="fa-solid fa-rotate"></i> Fetch Backup List
+              </button>
+
+              <div id="backup-restore-list">
+                <div class="empty-state" style="padding:30px 0">
+                  <div class="empty-icon"><i class="fa-solid fa-cloud-arrow-down"></i></div>
+                  <p>Click "Fetch Backup List" to load available backups</p>
+                </div>
+              </div>
+
+              <!-- Restore progress -->
+              <div id="restore-progress-wrap" style="display:none;margin-top:12px">
+                <div class="progress-bar-wrap">
+                  <div class="progress-bar-fill" id="restore-progress-fill" style="width:0%"></div>
+                </div>
+                <div class="progress-label" id="restore-progress-label">Restoring…</div>
+              </div>
+
+              <div class="backup-log" id="backup-restore-log"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════ Settings Tab ══════════════════════════════════ -->
+      <div class="tab-pane" data-tab="settings">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title"><i class="fa-solid fa-sliders"></i> Application Settings</div>
+            </div>
+            <div class="card-body">
+              <div class="form-group">
+                <label class="form-label">Application Name</label>
+                <input type="text" class="form-control" id="app-name" value="Employee Expense Verification System">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Organization Name</label>
+                <input type="text" class="form-control" id="org-name" placeholder="Your Organization">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Session Timeout (minutes)</label>
+                <input type="number" class="form-control" id="session-timeout" value="30" min="5" max="480">
+                <span class="form-hint">Current default: 30 minutes. Range: 5–480.</span>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Max HR Versions to Keep</label>
+                <input type="number" class="form-control" id="max-versions" value="10" min="3" max="50">
+                <span class="form-hint">Older versions beyond this limit are auto-pruned.</span>
+              </div>
+              <button class="btn btn-primary" id="save-settings-btn">
+                <i class="fa-solid fa-floppy-disk"></i> Save Settings
+              </button>
             </div>
           </div>
 
           <div class="card">
             <div class="card-header">
-              <div class="card-title"><i class="fa-solid fa-cloud-arrow-down"></i> Restore & Rollback</div>
+              <div class="card-title"><i class="fa-solid fa-key"></i> Encryption &amp; Security</div>
             </div>
             <div class="card-body">
-              <p style="font-size:.875rem;color:var(--text-secondary);margin-bottom:16px">
-                Download and restore an encrypted backup from GitHub.
-              </p>
-              <button class="btn btn-outline" id="fetch-backups-btn" style="margin-bottom:16px">
-                <i class="fa-solid fa-rotate"></i> Fetch Backup List
-              </button>
-              <div id="backup-list">
-                <div class="empty-state" style="padding:30px 0">
-                  <div class="empty-icon"><i class="fa-solid fa-cloud-arrow-down"></i></div>
-                  <p>Click "Fetch Backup List" to load backups</p>
+              <div class="form-group">
+                <label class="form-label">App Encryption Key (read-only)</label>
+                <div class="input-group">
+                  <span class="input-icon"><i class="fa-solid fa-lock"></i></span>
+                  <input type="password" class="form-control" id="app-enc-key" readonly>
+                  <button class="input-addon" id="show-enc-key-btn" type="button"><i class="fa-regular fa-eye"></i></button>
                 </div>
+                <span class="form-hint">Auto-generated. Used to encrypt all HR/Accounts data at rest.</span>
+              </div>
+              <button class="btn btn-outline btn-sm" id="copy-enc-key-btn" style="margin-top:8px">
+                <i class="fa-solid fa-copy"></i> Copy Key
+              </button>
+
+              <div style="margin-top:20px;padding:12px 16px;background:var(--primary-xlight);border:1px solid var(--primary-light);border-radius:var(--radius-sm)">
+                <div style="font-weight:600;font-size:.8rem;margin-bottom:6px;color:var(--primary)"><i class="fa-solid fa-triangle-exclamation"></i> Important</div>
+                <ul style="font-size:.78rem;color:var(--text-secondary);margin:0;padding-left:16px;line-height:1.8">
+                  <li>All data is stored encrypted in IndexedDB</li>
+                  <li>Clearing browser data removes all records</li>
+                  <li>Use GitHub Backup to persist data across devices</li>
+                  <li>Keep your backup encryption key safe</li>
+                </ul>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Settings Tab -->
-      <div class="tab-pane" data-tab="settings">
-        <div class="card" style="max-width:640px">
-          <div class="card-header">
-            <div class="card-title"><i class="fa-solid fa-sliders"></i> Application Settings</div>
+      <!-- ══════ Versions Tab ══════════════════════════════════ -->
+      <div class="tab-pane" data-tab="versions">
+        <div data-tab-group id="version-tabs">
+          <div class="tabs-nav">
+            <button class="tab-btn active" data-tab="hr-versions"><i class="fa-solid fa-users"></i> HR Versions</button>
+            <button class="tab-btn" data-tab="acc-versions"><i class="fa-solid fa-file-invoice-dollar"></i> Account Batches</button>
+            <button class="tab-btn" data-tab="verify-sessions"><i class="fa-solid fa-shield-check"></i> Verification Sessions</button>
           </div>
-          <div class="card-body">
-            <div class="form-group">
-              <label class="form-label">Application Name</label>
-              <input type="text" class="form-control" id="app-name" value="Employee Expense Verification System">
+
+          <!-- HR versions -->
+          <div class="tab-pane active" data-tab="hr-versions">
+            <div class="card">
+              <div class="card-header">
+                <div class="card-title"><i class="fa-solid fa-code-branch"></i> HR Master Versions</div>
+                <div id="hr-ver-count" style="font-size:.78rem;color:var(--text-muted)">Loading…</div>
+              </div>
+              <div class="table-wrap" style="max-height:460px;overflow-y:auto">
+                <table class="data-table">
+                  <thead><tr><th>Version</th><th>File</th><th>Uploaded By</th><th>Date</th><th>Records</th><th>Errors</th><th>Hash</th><th>Status</th><th>Actions</th></tr></thead>
+                  <tbody id="hr-ver-tbody"><tr><td colspan="9" style="text-align:center;padding:40px;color:var(--text-muted)">Loading…</td></tr></tbody>
+                </table>
+              </div>
             </div>
-            <div class="form-group">
-              <label class="form-label">Organization Name</label>
-              <input type="text" class="form-control" id="org-name" placeholder="Your Organization">
+          </div>
+
+          <!-- Account batches -->
+          <div class="tab-pane" data-tab="acc-versions">
+            <div class="card">
+              <div class="card-header">
+                <div class="card-title"><i class="fa-solid fa-layer-group"></i> Account Batches</div>
+                <div id="acc-ver-count" style="font-size:.78rem;color:var(--text-muted)">Loading…</div>
+              </div>
+              <div class="table-wrap" style="max-height:460px;overflow-y:auto">
+                <table class="data-table">
+                  <thead><tr><th>Batch</th><th>Files</th><th>Uploaded By</th><th>Date</th><th>Records</th><th>Errors</th><th>Status</th></tr></thead>
+                  <tbody id="acc-ver-tbody"><tr><td colspan="7" style="text-align:center;padding:40px;color:var(--text-muted)">Loading…</td></tr></tbody>
+                </table>
+              </div>
             </div>
-            <div class="form-group">
-              <label class="form-label">Session Timeout (minutes)</label>
-              <input type="number" class="form-control" id="session-timeout" value="30" min="5" max="480">
+          </div>
+
+          <!-- Verification sessions -->
+          <div class="tab-pane" data-tab="verify-sessions">
+            <div class="card">
+              <div class="card-header">
+                <div class="card-title"><i class="fa-solid fa-shield-check"></i> Verification Sessions</div>
+                <div id="verify-ver-count" style="font-size:.78rem;color:var(--text-muted)">Loading…</div>
+              </div>
+              <div class="table-wrap" style="max-height:460px;overflow-y:auto">
+                <table class="data-table">
+                  <thead><tr><th>Date</th><th>By</th><th>Source</th><th>Total</th><th>Matched</th><th>Mismatch</th><th>PDF</th></tr></thead>
+                  <tbody id="verify-ver-tbody"><tr><td colspan="7" style="text-align:center;padding:40px;color:var(--text-muted)">Loading…</td></tr></tbody>
+                </table>
+              </div>
             </div>
-            <div class="form-group">
-              <label class="form-label">Max Versions to Keep (HR)</label>
-              <input type="number" class="form-control" id="max-versions" value="10" min="3" max="50">
-            </div>
-            <button class="btn btn-primary" id="save-settings-btn">
-              <i class="fa-solid fa-floppy-disk"></i> Save Settings
-            </button>
           </div>
         </div>
       </div>
 
-      <!-- Versions Tab -->
-      <div class="tab-pane" data-tab="version">
-        <div class="card">
-          <div class="card-header">
-            <div class="card-title"><i class="fa-solid fa-code-branch"></i> Version History</div>
-          </div>
-          <div class="table-wrap">
-            <table class="data-table">
-              <thead>
-                <tr>
-                  <th>Version</th><th>Type</th><th>Uploaded By</th>
-                  <th>Date</th><th>Records</th><th>Hash</th><th>Actions</th>
-                </tr>
-              </thead>
-              <tbody id="version-tbody">
-                <tr><td colspan="7" style="text-align:center;padding:40px;color:var(--text-muted)">
-                  No version history yet
-                </td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
-    </div><!-- /tab-group -->
-  </div><!-- /page-content -->
+    </div><!-- /admin-tabs -->
+  </div>
 </main>
 
+<!-- ── Scripts ──────────────────────────────────────────────── -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
 <script src="js/utils.js"></script>
 <script src="js/database.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/audit.js"></script>
+<script src="js/encryption.js"></script>
 <script src="js/app.js"></script>
+<script src="js/backup.js"></script>
 
 <script>
 (async () => {
@@ -332,61 +428,74 @@
   const sess = Auth.getCurrentUser();
   await App.init();
 
-  document.getElementById('dm-name').textContent = sess.displayName || sess.username;
-  document.getElementById('dm-role').textContent = Auth.getRoleInfo(sess.role).label;
-  document.querySelector('.user-avatar').textContent = Utils.getInitials(sess.displayName || sess.username);
+  /* ── User info ─────────────────────────────────────────── */
+  const initials = Utils.getInitials(sess.displayName || sess.username);
+  document.getElementById('user-avatar').textContent    = initials;
+  document.getElementById('sidebar-avatar').textContent = initials;
+  document.getElementById('sidebar-name').textContent   = sess.displayName || sess.username;
+  document.getElementById('dm-name').textContent        = sess.displayName || sess.username;
+  document.getElementById('dm-role').textContent        = Auth.ROLES[sess.role]?.label || 'Administrator';
 
   App.setBreadcrumb([
-    { label: 'Home', icon: 'fa-house' },
-    { label: 'Dashboard' },
-    { label: 'Administration' }
+    { label:'Home', icon:'fa-house' },
+    { label:'Dashboard', href:'dashboard.html' },
+    { label:'Administration' },
   ]);
 
-  /* ── Load Users ─────────────────────────────────────────── */
+  /* ── Tab lazy-load ─────────────────────────────────────── */
+  document.querySelectorAll('#admin-tabs > .tabs-nav .tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const tab = btn.dataset.tab;
+      if (tab === 'audit')    loadAuditLogs();
+      if (tab === 'versions') loadVersions();
+      if (tab === 'backup')   loadGHSettings();
+      if (tab === 'settings') loadSettings();
+    });
+  });
+
+  /* ════════════════════════════════════════════════════════
+     USERS
+  ════════════════════════════════════════════════════════ */
   async function loadUsers(filter = '') {
-    const users = await Database.getAll('users');
+    const users      = await Database.getAll('users');
     const roleFilter = document.getElementById('role-filter').value;
+    const q          = filter.toLowerCase();
+
     let list = users;
-    if (filter) {
-      const q = filter.toLowerCase();
-      list = list.filter(u => u.username.toLowerCase().includes(q) ||
-        (u.displayName || '').toLowerCase().includes(q) ||
-        (u.department || '').toLowerCase().includes(q));
-    }
+    if (q) list = list.filter(u =>
+      u.username.toLowerCase().includes(q) ||
+      (u.displayName || '').toLowerCase().includes(q) ||
+      (u.department  || '').toLowerCase().includes(q));
     if (roleFilter) list = list.filter(u => u.role === roleFilter);
 
     const tbody = document.getElementById('users-tbody');
     if (!list.length) {
-      tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state">
-        <div class="empty-icon"><i class="fa-solid fa-users-slash"></i></div>
-        <h5>No users found</h5></div></td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><div class="empty-icon"><i class="fa-solid fa-users-slash"></i></div><h5>No users found</h5></div></td></tr>`;
       return;
     }
 
     tbody.innerHTML = list.map(u => {
-      const ri = Auth.getRoleInfo(u.role);
+      const ri = Auth.ROLES[u.role] || { label: u.role };
       const statusBadge = u.status === 'active'
-        ? `<span class="badge badge-green"><i class="fa-solid fa-circle" style="font-size:.5rem"></i> Active</span>`
-        : `<span class="badge badge-gray">Inactive</span>`;
+        ? `<span class="badge badge-green"><i class="fa-solid fa-circle" style="font-size:.45rem"></i> Active</span>`
+        : `<span class="badge" style="background:var(--bg);color:var(--text-muted);border:1px solid var(--border)">Inactive</span>`;
       return `<tr>
         <td><strong>${Utils.escapeHtml(u.username)}</strong></td>
         <td>${Utils.escapeHtml(u.displayName || '—')}</td>
         <td><span class="role-badge role-${u.role}">${Utils.escapeHtml(ri.label)}</span></td>
         <td>${Utils.escapeHtml(u.department || '—')}</td>
         <td>${statusBadge}</td>
-        <td>${Utils.formatDate(u.createdAt)}</td>
+        <td style="font-size:.8rem;white-space:nowrap">${Utils.formatDate(u.createdAt)}</td>
         <td>
           <div style="display:flex;gap:6px">
-            <button class="btn btn-ghost btn-sm" onclick="editUser('${u.id}')">
-              <i class="fa-solid fa-pen"></i>
-            </button>
+            <button class="btn btn-ghost btn-sm btn-icon" onclick="editUser('${u.id}')" title="Edit"><i class="fa-solid fa-pen"></i></button>
             ${u.username !== 'admin' ? `
-            <button class="btn btn-ghost btn-sm" onclick="toggleUser('${u.id}','${u.status}')">
-              <i class="fa-solid fa-${u.status === 'active' ? 'ban' : 'check'}"></i>
-            </button>
-            <button class="btn btn-ghost btn-sm" style="color:var(--accent-red)" onclick="deleteUser('${u.id}')">
-              <i class="fa-solid fa-trash"></i>
-            </button>` : ''}
+              <button class="btn btn-ghost btn-sm btn-icon" onclick="toggleUser('${u.id}','${u.status}')" title="${u.status==='active'?'Deactivate':'Activate'}">
+                <i class="fa-solid fa-${u.status==='active'?'ban':'check'}"></i>
+              </button>
+              <button class="btn btn-ghost btn-sm btn-icon" style="color:var(--accent-red)" onclick="deleteUser('${u.id}')" title="Delete">
+                <i class="fa-solid fa-trash"></i>
+              </button>` : '<span style="font-size:.72rem;color:var(--text-muted)">Protected</span>'}
           </div>
         </td>
       </tr>`;
@@ -394,45 +503,26 @@
   }
 
   await loadUsers();
-
-  document.getElementById('user-search').addEventListener('input', Utils.debounce(e => {
-    loadUsers(e.target.value);
-  }));
-  document.getElementById('role-filter').addEventListener('change', () => {
-    loadUsers(document.getElementById('user-search').value);
-  });
-
-  /* ── Add User ───────────────────────────────────────────── */
+  document.getElementById('user-search').addEventListener('input',  Utils.debounce(e => loadUsers(e.target.value), 250));
+  document.getElementById('role-filter').addEventListener('change', () => loadUsers(document.getElementById('user-search').value));
   document.getElementById('add-user-btn').addEventListener('click', () => showUserModal());
 
-  window.editUser = async (id) => {
-    const user = await Database.get('users', id);
-    if (user) showUserModal(user);
-  };
-
-  window.toggleUser = async (id, currentStatus) => {
-    const user = await Database.get('users', id);
-    if (!user) return;
-    user.status = currentStatus === 'active' ? 'inactive' : 'active';
-    await Database.put('users', user);
-    await Audit.log({ module: 'Admin', action: 'ToggleUser', status: 'success', detail: `${user.username} → ${user.status}` });
-    App.Toast.success('Updated', `User ${user.username} is now ${user.status}.`);
+  window.editUser   = async id => { const u = await Database.get('users', id); if (u) showUserModal(u); };
+  window.toggleUser = async (id, cur) => {
+    const u = await Database.get('users', id); if (!u) return;
+    u.status = cur === 'active' ? 'inactive' : 'active';
+    await Database.put('users', u);
+    await Audit.log({ module:'Admin', action:'ToggleUser', status:'success', detail:`${u.username} → ${u.status}` });
+    App.Toast.success('Updated', `${u.username} is now ${u.status}.`);
     loadUsers();
   };
-
-  window.deleteUser = async (id) => {
-    const user = await Database.get('users', id);
-    if (!user) return;
-    const ok = await App.Modal.confirm({
-      title: 'Delete User',
-      message: `Are you sure you want to delete "${user.username}"? This cannot be undone.`,
-      confirmText: 'Delete',
-      confirmClass: 'btn-danger'
-    });
+  window.deleteUser = async id => {
+    const u = await Database.get('users', id); if (!u) return;
+    const ok = await App.Modal.confirm({ title:'Delete User', message:`Delete "${u.username}"? Cannot be undone.`, confirmText:'Delete', confirmClass:'btn-danger' });
     if (!ok) return;
-    await Database.delete('users', id);
-    await Audit.log({ module: 'Admin', action: 'DeleteUser', status: 'success', detail: user.username });
-    App.Toast.success('Deleted', `User ${user.username} removed.`);
+    await Database.remove('users', id);
+    await Audit.log({ module:'Admin', action:'DeleteUser', status:'success', detail:u.username });
+    App.Toast.success('Deleted', `${u.username} removed.`);
     loadUsers();
   };
 
@@ -440,56 +530,42 @@
     const isEdit = !!user;
     const { el, close } = App.Modal.create({
       title: isEdit ? 'Edit User' : 'Add New User',
-      size: '',
       body: `
         <div class="form-group">
-          <label class="form-label">Username <span class="required">*</span></label>
-          <input type="text" class="form-control" id="m-username" value="${Utils.escapeHtml(user?.username || '')}"
-                 ${isEdit ? 'readonly' : ''} placeholder="e.g. jsmith">
+          <label class="form-label">Username <span style="color:var(--accent-red)">*</span></label>
+          <input type="text" class="form-control" id="m-username" value="${Utils.escapeHtml(user?.username||'')}" ${isEdit?'readonly':''} placeholder="e.g. jsmith">
         </div>
         <div class="form-group">
           <label class="form-label">Display Name</label>
-          <input type="text" class="form-control" id="m-displayname" value="${Utils.escapeHtml(user?.displayName || '')}" placeholder="John Smith">
+          <input type="text" class="form-control" id="m-displayname" value="${Utils.escapeHtml(user?.displayName||'')}" placeholder="John Smith">
         </div>
         <div class="form-group">
-          <label class="form-label">Role <span class="required">*</span></label>
+          <label class="form-label">Role <span style="color:var(--accent-red)">*</span></label>
           <select class="form-control" id="m-role">
-            ${Auth.getAllRoles().map(r =>
-              `<option value="${r.key}" ${user?.role === r.key ? 'selected' : ''}>${r.label}</option>`
-            ).join('')}
+            ${Object.entries(Auth.ROLES).map(([k,v]) => `<option value="${k}" ${user?.role===k?'selected':''}>${v.label}</option>`).join('')}
           </select>
         </div>
         <div class="form-group">
           <label class="form-label">Department</label>
-          <input type="text" class="form-control" id="m-dept" value="${Utils.escapeHtml(user?.department || '')}" placeholder="HR / Accounts / IT">
+          <input type="text" class="form-control" id="m-dept" value="${Utils.escapeHtml(user?.department||'')}" placeholder="HR / Accounts / IT">
         </div>
-        ${!isEdit ? `
         <div class="form-group">
-          <label class="form-label">Password <span class="required">*</span></label>
+          <label class="form-label">${isEdit?'New Password <span style="font-weight:400;color:var(--text-muted)">(leave blank to keep)</span>':'Password <span style=\'color:var(--accent-red)\'>*</span>'}</label>
           <div class="input-group">
             <span class="input-icon"><i class="fa-solid fa-lock"></i></span>
-            <input type="password" class="form-control" id="m-password" placeholder="Min 8 characters">
+            <input type="password" class="form-control" id="m-password" placeholder="${isEdit?'Leave blank to keep':'Min 8 characters'}">
           </div>
-        </div>` : `
-        <div class="form-group">
-          <label class="form-label">New Password <span style="font-weight:400;color:var(--text-muted)">(leave blank to keep current)</span></label>
-          <div class="input-group">
-            <span class="input-icon"><i class="fa-solid fa-lock"></i></span>
-            <input type="password" class="form-control" id="m-password" placeholder="Leave blank to keep">
-          </div>
-        </div>`}
+        </div>
         <div class="form-group">
           <label class="form-label">Status</label>
           <select class="form-control" id="m-status">
-            <option value="active"   ${user?.status !== 'inactive' ? 'selected' : ''}>Active</option>
-            <option value="inactive" ${user?.status === 'inactive'  ? 'selected' : ''}>Inactive</option>
+            <option value="active"   ${user?.status!=='inactive'?'selected':''}>Active</option>
+            <option value="inactive" ${user?.status==='inactive' ?'selected':''}>Inactive</option>
           </select>
         </div>`,
       footer: `
         <button class="btn btn-ghost" id="modal-cancel">Cancel</button>
-        <button class="btn btn-primary" id="modal-save">
-          <i class="fa-solid fa-floppy-disk"></i> ${isEdit ? 'Update' : 'Create'} User
-        </button>`
+        <button class="btn btn-primary" id="modal-save"><i class="fa-solid fa-floppy-disk"></i> ${isEdit?'Update':'Create'}</button>`
     });
 
     el.querySelector('#modal-cancel').addEventListener('click', close);
@@ -501,164 +577,376 @@
       const password    = el.querySelector('#m-password').value;
       const status      = el.querySelector('#m-status').value;
 
-      if (!username) { App.Toast.error('Validation', 'Username is required.'); return; }
-      if (!isEdit && !password) { App.Toast.error('Validation', 'Password is required.'); return; }
-      if (!isEdit && password.length < 8) { App.Toast.error('Validation', 'Password must be at least 8 characters.'); return; }
-
+      if (!username)                       { App.Toast.error('Validation','Username required.'); return; }
+      if (!isEdit && !password)            { App.Toast.error('Validation','Password required.'); return; }
+      if (!isEdit && password.length < 8)  { App.Toast.error('Validation','Password must be ≥ 8 chars.'); return; }
       if (!isEdit) {
         const existing = await Database.getAll('users');
         if (existing.find(u => u.username.toLowerCase() === username.toLowerCase())) {
-          App.Toast.error('Duplicate', 'A user with that username already exists.');
-          return;
+          App.Toast.error('Duplicate','Username already exists.'); return;
         }
       }
 
-      const salt       = user?.salt || Utils.uuid();
-      const passHash   = password
-        ? CryptoJS.SHA256(password + salt).toString()
-        : user?.passwordHash;
-
-      const record = {
-        id:          user?.id || Utils.uuid(),
-        username, displayName, role, department, status,
-        salt, passwordHash: passHash,
-        createdAt:   user?.createdAt || new Date().toISOString(),
-        createdBy:   user?.createdBy || sess.username,
-        updatedAt:   new Date().toISOString()
-      };
+      const salt     = user?.salt || Utils.uuid();
+      const passHash = password ? CryptoJS.SHA256(password + salt).toString() : user?.passwordHash;
+      const record   = { id: user?.id || Utils.uuid(), username, displayName, role, department, status, salt, passwordHash: passHash, createdAt: user?.createdAt || new Date().toISOString(), createdBy: user?.createdBy || sess.username, updatedAt: new Date().toISOString() };
 
       await Database.put('users', record);
-      await Audit.log({ module: 'Admin', action: isEdit ? 'UpdateUser' : 'CreateUser', status: 'success', detail: username });
-      App.Toast.success('Success', `User ${username} ${isEdit ? 'updated' : 'created'}.`);
-      close();
-      loadUsers();
+      await Audit.log({ module:'Admin', action: isEdit?'UpdateUser':'CreateUser', status:'success', detail: username });
+      App.Toast.success('Success', `User ${username} ${isEdit?'updated':'created'}.`);
+      close(); loadUsers();
     });
   }
 
-  /* ── Load Audit Logs ────────────────────────────────────── */
-  async function loadAuditLogs(filter = '') {
-    const logs = await Audit.getRecent(200);
-    const q    = filter.toLowerCase();
-    const list = filter
-      ? logs.filter(l => l.user.toLowerCase().includes(q) ||
-          l.module.toLowerCase().includes(q) || l.action.toLowerCase().includes(q))
-      : logs;
+  /* ════════════════════════════════════════════════════════
+     AUDIT LOGS
+  ════════════════════════════════════════════════════════ */
+  let allLogs = [];
 
+  async function loadAuditLogs() {
+    allLogs = await Audit.getRecent(500);
+    renderAuditTable();
+  }
+
+  function renderAuditTable() {
+    const q      = document.getElementById('audit-search').value.toLowerCase();
+    const mod    = document.getElementById('audit-module-filter').value;
+    const status = document.getElementById('audit-status-filter').value;
+
+    const list = allLogs.filter(l =>
+      (!q      || l.user.toLowerCase().includes(q) || l.module.toLowerCase().includes(q) || l.action.toLowerCase().includes(q) || (l.detail||'').toLowerCase().includes(q)) &&
+      (!mod    || l.module === mod) &&
+      (!status || l.status === status)
+    );
+
+    document.getElementById('audit-count').textContent = `Showing ${list.length} of ${allLogs.length} logs`;
+
+    const statusMap = { success:'badge-green', error:'badge-red', warning:'badge-yellow' };
     const tbody = document.getElementById('audit-tbody');
-    if (!list.length) {
-      tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--text-muted)">No logs found</td></tr>`;
-      return;
-    }
-
-    const statusMap = { success: 'badge-green', error: 'badge-red', warning: 'badge-orange' };
-    tbody.innerHTML = list.map(l => `<tr>
-      <td style="white-space:nowrap;font-size:.8rem;">${Utils.formatDateTime(l.date)}</td>
-      <td>${Utils.escapeHtml(l.user)}</td>
-      <td><span class="role-badge role-${l.role}">${Utils.escapeHtml(Auth.getRoleInfo(l.role).label)}</span></td>
+    tbody.innerHTML = list.length ? list.map(l => `<tr>
+      <td style="white-space:nowrap;font-size:.78rem">${Utils.formatDateTime(l.date)}</td>
+      <td><strong>${Utils.escapeHtml(l.user)}</strong></td>
+      <td><span class="role-badge role-${l.role}" style="font-size:.7rem">${Utils.escapeHtml(Auth.ROLES[l.role]?.label || l.role)}</span></td>
       <td>${Utils.escapeHtml(l.module)}</td>
       <td>${Utils.escapeHtml(l.action)}</td>
-      <td><span class="badge ${statusMap[l.status] || 'badge-gray'}">${Utils.escapeHtml(l.status)}</span></td>
-      <td style="font-size:.78rem;color:var(--text-muted)">${Utils.escapeHtml(l.detail || '')}</td>
-    </tr>`).join('');
+      <td><span class="badge ${statusMap[l.status]||'badge-blue'}">${Utils.escapeHtml(l.status)}</span></td>
+      <td style="font-size:.75rem;color:var(--text-muted);max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${Utils.escapeHtml(l.detail||'')}">${Utils.escapeHtml(l.detail||'')}</td>
+    </tr>`).join('') :
+    '<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--text-muted)">No logs match filter</td></tr>';
   }
 
-  document.getElementById('audit-search').addEventListener('input', Utils.debounce(e => {
-    loadAuditLogs(e.target.value);
-  }));
+  document.getElementById('audit-search').addEventListener('input',        Utils.debounce(renderAuditTable, 250));
+  document.getElementById('audit-module-filter').addEventListener('change', renderAuditTable);
+  document.getElementById('audit-status-filter').addEventListener('change', renderAuditTable);
 
-  /* ── Load tabs on click ─────────────────────────────────── */
-  document.querySelectorAll('.tab-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      if (btn.dataset.tab === 'audit') loadAuditLogs();
-      if (btn.dataset.tab === 'version') loadVersionHistory();
-    });
+  document.getElementById('export-audit-btn').addEventListener('click', () => {
+    if (!allLogs.length) { App.Toast.warning('No Logs','No audit data loaded.'); return; }
+    const header = 'Date,User,Role,Module,Action,Status,Detail';
+    const rows   = allLogs.map(l => [
+      l.date, l.user, l.role, l.module, l.action, l.status,
+      `"${(l.detail||'').replace(/"/g,'""')}"`,
+    ].join(','));
+    Utils.downloadBlob(new Blob([[header,...rows].join('\r\n')], {type:'text/csv'}),
+      `AuditLog_${new Date().toISOString().slice(0,10)}.csv`);
+    App.Toast.success('Exported','Audit log exported to CSV.');
   });
 
-  /* ── Version History ────────────────────────────────────── */
-  async function loadVersionHistory() {
-    const versions = await Database.getAll('versionHistory');
-    const tbody = document.getElementById('version-tbody');
-    if (!versions.length) {
-      tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--text-muted)">No versions yet</td></tr>`;
-      return;
-    }
-    const sorted = versions.sort((a,b) => b.version - a.version);
-    tbody.innerHTML = sorted.map(v => `<tr>
-      <td><span class="badge badge-blue">v${v.version}</span></td>
-      <td><span class="badge badge-${v.type === 'hr' ? 'blue' : 'teal'}">${v.type.toUpperCase()}</span></td>
-      <td>${Utils.escapeHtml(v.uploadedBy || '—')}</td>
-      <td>${Utils.formatDateTime(v.uploadedAt)}</td>
-      <td>${Utils.formatNumber(v.recordCount || 0)}</td>
-      <td style="font-size:.72rem;font-family:monospace;color:var(--text-muted)">${(v.hash || '').slice(0,12)}…</td>
-      <td><button class="btn btn-ghost btn-sm">Restore</button></td>
-    </tr>`).join('');
+  document.getElementById('prune-audit-btn').addEventListener('click', async () => {
+    const ok = await App.Modal.confirm({ title:'Prune Old Logs', message:'Delete audit logs older than 90 days?', confirmText:'Prune', confirmClass:'btn-danger' });
+    if (!ok) return;
+    await Audit.pruneOlderThan(90);
+    App.Toast.success('Pruned','Old audit logs deleted.');
+    await loadAuditLogs();
+  });
+
+  /* ════════════════════════════════════════════════════════
+     BACKUP
+  ════════════════════════════════════════════════════════ */
+  async function loadGHSettings() {
+    const cfg = await Backup.getConfig();
+    document.getElementById('gh-token').value  = cfg.token;
+    document.getElementById('gh-repo').value   = cfg.repo;
+    document.getElementById('gh-branch').value = cfg.branch || 'main';
+    document.getElementById('gh-enc-key').value = cfg.encKey;
+    updateKeyStrength(cfg.encKey);
   }
-
-  /* ── Settings ───────────────────────────────────────────── */
-  const appName  = await Database.getSetting('appName', 'Employee Expense Verification System');
-  const orgName  = await Database.getSetting('orgName', '');
-  const timeout  = await Database.getSetting('sessionTimeout', 30);
-  const maxVer   = await Database.getSetting('maxVersions', 10);
-  document.getElementById('app-name').value       = appName;
-  document.getElementById('org-name').value       = orgName;
-  document.getElementById('session-timeout').value = timeout;
-  document.getElementById('max-versions').value    = maxVer;
-
-  document.getElementById('save-settings-btn').addEventListener('click', async () => {
-    await Database.setSetting('appName',        document.getElementById('app-name').value);
-    await Database.setSetting('orgName',        document.getElementById('org-name').value);
-    await Database.setSetting('sessionTimeout', parseInt(document.getElementById('session-timeout').value));
-    await Database.setSetting('maxVersions',    parseInt(document.getElementById('max-versions').value));
-    await Audit.log({ module: 'Admin', action: 'SaveSettings', status: 'success' });
-    App.Toast.success('Saved', 'Application settings updated.');
-  });
-
-  /* ── GitHub Settings ────────────────────────────────────── */
-  const ghToken  = await Database.getSetting('ghToken',  '');
-  const ghRepo   = await Database.getSetting('ghRepo',   '');
-  const ghBranch = await Database.getSetting('ghBranch', 'main');
-  document.getElementById('gh-token').value  = ghToken;
-  document.getElementById('gh-repo').value   = ghRepo;
-  document.getElementById('gh-branch').value = ghBranch;
 
   document.getElementById('gh-token-toggle').addEventListener('click', () => {
     const inp = document.getElementById('gh-token');
-    inp.type = inp.type === 'password' ? 'text' : 'password';
+    inp.type  = inp.type === 'password' ? 'text' : 'password';
   });
 
-  document.getElementById('save-gh-settings').addEventListener('click', async () => {
+  document.getElementById('gh-enc-key').addEventListener('input', e => updateKeyStrength(e.target.value));
+
+  function updateKeyStrength(key) {
+    const bar = document.getElementById('key-strength-bar');
+    const len = key.length;
+    if (len === 0) { bar.style.width = '0%'; bar.className = 'key-strength'; return; }
+    if (len < 16)  { bar.style.width = '30%'; bar.className = 'key-strength key-weak'; return; }
+    if (len < 24)  { bar.style.width = '60%'; bar.className = 'key-strength key-ok'; return; }
+    bar.style.width = '100%'; bar.className = 'key-strength key-strong';
+  }
+
+  document.getElementById('save-gh-btn').addEventListener('click', async () => {
     await Database.setSetting('ghToken',  document.getElementById('gh-token').value);
     await Database.setSetting('ghRepo',   document.getElementById('gh-repo').value);
     await Database.setSetting('ghBranch', document.getElementById('gh-branch').value);
     await Database.setSetting('ghEncKey', document.getElementById('gh-enc-key').value);
-    App.Toast.success('Saved', 'GitHub settings saved.');
+    App.Toast.success('Saved','GitHub backup settings saved.');
   });
 
   document.getElementById('test-gh-btn').addEventListener('click', async () => {
-    const token  = document.getElementById('gh-token').value.trim();
-    const repo   = document.getElementById('gh-repo').value.trim();
-    const branch = document.getElementById('gh-branch').value.trim();
-    if (!token || !repo) { App.Toast.warning('Missing', 'Token and repo are required.'); return; }
-    App.Loader.show('Testing GitHub connection…');
+    const token = document.getElementById('gh-token').value.trim();
+    const repo  = document.getElementById('gh-repo').value.trim();
+    if (!token || !repo) { App.Toast.warning('Missing','Token and repo required.'); return; }
+    App.Loader.show('Testing connection…');
     try {
-      const res = await fetch(`https://api.github.com/repos/${repo}`, {
-        headers: { Authorization: `token ${token}`, Accept: 'application/vnd.github.v3+json' }
-      });
-      if (res.ok) {
-        App.Toast.success('Connected', `Successfully connected to ${repo}.`);
-      } else {
-        App.Toast.error('Failed', `GitHub returned: ${res.status} ${res.statusText}`);
-      }
-    } catch (e) {
-      App.Toast.error('Error', e.message);
-    } finally {
+      const info = await Backup.testConnection(token, repo);
       App.Loader.hide();
+      App.Toast.success('Connected', `${info.name} (${info.private?'private':'public'}) — default branch: ${info.defaultBranch}`);
+    } catch (e) {
+      App.Loader.hide();
+      App.Toast.error('Connection Failed', e.message);
     }
   });
 
-  await Audit.log({ module: 'Admin', action: 'PageView', status: 'success', detail: 'Admin panel opened' });
+  /* ── Push backup ────────────────────────────────────────── */
+  document.getElementById('push-backup-btn').addEventListener('click', async () => {
+    const log = document.getElementById('backup-push-log');
+    log.style.display = 'block';
+    log.innerHTML     = '';
+
+    function addLog(msg, cls = '') {
+      const div = document.createElement('div');
+      div.className = `backup-log-line ${cls}`;
+      div.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+      log.appendChild(div);
+      log.scrollTop = log.scrollHeight;
+    }
+
+    try {
+      addLog('Starting backup…');
+      const { fileName, meta } = await Backup.pushBackup(sess.username, (pct, msg) => {
+        addLog(`${pct}% — ${msg}`);
+      });
+      addLog(`✓ ${fileName} pushed successfully.`, 'ok');
+      addLog(`Stores: ${Object.entries(meta.recordCounts).map(([k,v])=>`${k}:${v}`).join(', ')}`, 'ok');
+      App.Toast.success('Backup Complete', fileName);
+    } catch (e) {
+      addLog(`✗ ${e.message}`, 'err');
+      App.Toast.error('Backup Failed', e.message);
+    }
+  });
+
+  /* ── Fetch backup list ──────────────────────────────────── */
+  document.getElementById('fetch-backups-btn').addEventListener('click', async () => {
+    App.Loader.show('Fetching backups…');
+    const container = document.getElementById('backup-restore-list');
+    try {
+      const files = await Backup.fetchBackupList();
+      App.Loader.hide();
+      if (!files.length) {
+        container.innerHTML = '<div class="empty-state" style="padding:30px 0"><div class="empty-icon"><i class="fa-solid fa-cloud-arrow-down"></i></div><p>No backups found in repository</p></div>';
+        return;
+      }
+      container.innerHTML = files.map(f => `
+        <div class="backup-item">
+          <div class="bi-icon"><i class="fa-solid fa-file-shield"></i></div>
+          <div class="bi-info">
+            <div class="bi-name">${Utils.escapeHtml(f.name)}</div>
+            <div class="bi-meta">${Utils.formatFileSize(f.size)}</div>
+          </div>
+          <button class="btn btn-outline btn-sm" onclick="restoreBackup('${Utils.escapeHtml(f.path)}')">
+            <i class="fa-solid fa-cloud-arrow-down"></i> Restore
+          </button>
+        </div>`).join('');
+    } catch (e) {
+      App.Loader.hide();
+      container.innerHTML = `<div style="color:var(--accent-red);padding:16px">${Utils.escapeHtml(e.message)}</div>`;
+    }
+  });
+
+  window.restoreBackup = async filePath => {
+    const ok = await App.Modal.confirm({
+      title:'Restore Backup',
+      message:'This will overwrite ALL current data with the selected backup. Continue?',
+      confirmText:'Restore', confirmClass:'btn-danger',
+    });
+    if (!ok) return;
+
+    const encKey = document.getElementById('gh-enc-key').value.trim();
+    if (!encKey) { App.Toast.error('Key Required','Enter the backup encryption key first.'); return; }
+
+    const progressWrap = document.getElementById('restore-progress-wrap');
+    const fill  = document.getElementById('restore-progress-fill');
+    const label = document.getElementById('restore-progress-label');
+    const log   = document.getElementById('backup-restore-log');
+    progressWrap.style.display = 'block';
+    log.style.display = 'block';
+    log.innerHTML = '';
+
+    function addLog(msg, cls='') {
+      const div = document.createElement('div');
+      div.className = `backup-log-line ${cls}`;
+      div.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+      log.appendChild(div); log.scrollTop = log.scrollHeight;
+    }
+
+    try {
+      addLog('Downloading backup from GitHub…');
+      const { metadata, storeCount } = await Backup.restoreBackup(filePath, encKey, (pct, msg) => {
+        fill.style.width  = pct + '%';
+        label.textContent = msg;
+        addLog(`${pct}% — ${msg}`);
+      });
+      progressWrap.style.display = 'none';
+      addLog(`✓ Restored ${storeCount} store(s) from ${metadata.ts}`, 'ok');
+      App.Toast.success('Restored','Database restored. Reload the page to see fresh data.');
+    } catch (e) {
+      progressWrap.style.display = 'none';
+      addLog(`✗ ${e.message}`, 'err');
+      App.Toast.error('Restore Failed', e.message);
+    }
+  };
+
+  /* ════════════════════════════════════════════════════════
+     SETTINGS
+  ════════════════════════════════════════════════════════ */
+  async function loadSettings() {
+    document.getElementById('app-name').value        = await Database.getSetting('appName',        'Employee Expense Verification System');
+    document.getElementById('org-name').value        = await Database.getSetting('orgName',        '');
+    document.getElementById('session-timeout').value = await Database.getSetting('sessionTimeout', 30);
+    document.getElementById('max-versions').value    = await Database.getSetting('maxVersions',    10);
+
+    const encKey = await Encryption.getAppKey();
+    document.getElementById('app-enc-key').value = encKey;
+  }
+
+  document.getElementById('show-enc-key-btn').addEventListener('click', () => {
+    const inp = document.getElementById('app-enc-key');
+    inp.type  = inp.type === 'password' ? 'text' : 'password';
+  });
+  document.getElementById('copy-enc-key-btn').addEventListener('click', async () => {
+    const key = document.getElementById('app-enc-key').value;
+    await navigator.clipboard.writeText(key).catch(() => {});
+    App.Toast.success('Copied','Encryption key copied to clipboard.');
+  });
+
+  document.getElementById('save-settings-btn').addEventListener('click', async () => {
+    await Database.setSetting('appName',        document.getElementById('app-name').value);
+    await Database.setSetting('orgName',        document.getElementById('org-name').value);
+    await Database.setSetting('sessionTimeout', parseInt(document.getElementById('session-timeout').value) || 30);
+    await Database.setSetting('maxVersions',    parseInt(document.getElementById('max-versions').value)    || 10);
+    await Audit.log({ module:'Admin', action:'SaveSettings', status:'success' });
+    App.Toast.success('Saved','Application settings updated.');
+  });
+
+  await loadSettings();
+
+  /* ════════════════════════════════════════════════════════
+     VERSIONS
+  ════════════════════════════════════════════════════════ */
+  async function loadVersions() {
+    // HR versions
+    const hrVers = (await Database.getAll('versionHistory'))
+      .filter(v => v.type === 'hr')
+      .sort((a, b) => b.version - a.version);
+
+    document.getElementById('hr-ver-count').textContent = `${hrVers.length} version(s)`;
+    document.getElementById('hr-ver-tbody').innerHTML = hrVers.length ? hrVers.map(v => `
+      <tr>
+        <td><span class="badge ver-hr">v${v.version}</span></td>
+        <td style="font-size:.78rem;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${Utils.escapeHtml(v.fileName||'')}">
+          ${Utils.escapeHtml(v.fileName || '—')}
+        </td>
+        <td>${Utils.escapeHtml(v.uploadedBy || '—')}</td>
+        <td style="font-size:.8rem;white-space:nowrap">${Utils.formatDateTime(v.uploadedAt)}</td>
+        <td>${Utils.formatNumber(v.recordCount || 0)}</td>
+        <td>${v.validationSummary?.errors ?? '—'}</td>
+        <td style="font-family:var(--font-mono);font-size:.7rem;color:var(--text-muted)">${(v.hash||'').slice(0,12)}…</td>
+        <td>${v.isActive
+          ? '<span class="badge badge-green">Active</span>'
+          : '<span class="badge" style="background:var(--bg);border:1px solid var(--border);color:var(--text-muted)">Archived</span>'}
+        </td>
+        <td style="font-size:.78rem;white-space:nowrap">
+          ${!v.isActive ? `<button class="btn btn-ghost btn-sm" onclick="restoreHRVersion('${v.id}')"><i class="fa-solid fa-rotate-left"></i></button>` : '—'}
+        </td>
+      </tr>`).join('') :
+      '<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--text-muted)">No HR versions yet</td></tr>';
+
+    // Account batches
+    const accBatches = (await Database.getAll('accountsBatches'))
+      .sort((a, b) => (b.batchNo || 0) - (a.batchNo || 0));
+
+    document.getElementById('acc-ver-count').textContent = `${accBatches.length} batch(es)`;
+    document.getElementById('acc-ver-tbody').innerHTML = accBatches.length ? accBatches.map(b => `
+      <tr>
+        <td><span class="badge ver-acc">#${b.batchNo}</span></td>
+        <td style="font-size:.78rem;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${Utils.escapeHtml((b.fileNames||[]).join(', '))}">
+          ${Utils.escapeHtml((b.fileNames||[]).join(', '))}
+        </td>
+        <td>${Utils.escapeHtml(b.uploadedBy||'—')}</td>
+        <td style="font-size:.8rem;white-space:nowrap">${Utils.formatDateTime(b.uploadedAt)}</td>
+        <td>${b.recordCount||0}</td>
+        <td>${b.validationSummary?.errors ?? '—'}</td>
+        <td>${b.isActive
+          ? '<span class="badge badge-green">Active</span>'
+          : '<span class="badge" style="background:var(--bg);border:1px solid var(--border);color:var(--text-muted)">Archived</span>'}
+        </td>
+      </tr>`).join('') :
+      '<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--text-muted)">No account batches yet</td></tr>';
+
+    // Verification sessions
+    const sessions = (await Database.getAll('verifications'))
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+    document.getElementById('verify-ver-count').textContent = `${sessions.length} session(s)`;
+    document.getElementById('verify-ver-tbody').innerHTML = sessions.length ? sessions.map(s => {
+      const sum = s.summary || {};
+      return `<tr>
+        <td style="font-size:.8rem;white-space:nowrap">${Utils.formatDateTime(s.createdAt)}</td>
+        <td>${Utils.escapeHtml(s.createdBy||'—')}</td>
+        <td><span class="badge badge-${s.source==='pdf'?'red':'blue'}">${s.source||'manual'}</span></td>
+        <td>${sum.total||0}</td>
+        <td style="color:var(--accent-green);font-weight:600">${sum.matched||0}</td>
+        <td style="color:var(--accent-red);font-weight:600">${sum.mismatch||0}</td>
+        <td style="font-size:.75rem;color:var(--text-muted)">${Utils.escapeHtml(s.pdfFile||'—')}</td>
+      </tr>`;
+    }).join('') :
+    '<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--text-muted)">No verification sessions yet</td></tr>';
+
+    // Wire sub-tabs
+    App.initTabs && App.initTabs(document.getElementById('version-tabs'));
+  }
+
+  window.restoreHRVersion = async id => {
+    const ok = await App.Modal.confirm({ title:'Restore HR Version', message:'Replace active HR Master with this version?', confirmText:'Restore' });
+    if (!ok) return;
+    try {
+      App.Loader.show('Restoring…');
+      // Dynamically import HR restore if available
+      if (window.HR?.restoreVersion) {
+        await HR.restoreVersion(id);
+        App.Toast.success('Restored','HR version restored.');
+      } else {
+        App.Toast.info('Navigate to HR','Open the HR page and use restore from Version History tab.');
+      }
+      App.Loader.hide();
+      loadVersions();
+    } catch (e) {
+      App.Loader.hide();
+      App.Toast.error('Restore Failed', e.message);
+    }
+  };
+
+  /* ── Global header search ───────────────────────────────── */
+  document.getElementById('global-search-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter' && e.target.value.trim())
+      window.location.href = `user.html?search=${encodeURIComponent(e.target.value.trim())}`;
+  });
+
+  await Audit.log({ module:'Admin', action:'PageView', status:'success' });
 })();
 </script>
-
 </body>
 </html>
