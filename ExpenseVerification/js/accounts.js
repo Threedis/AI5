@@ -130,6 +130,14 @@ const Accounts = (() => {
     let currentSection = '';
     let skipNextNonBlank = false; // set after section header to skip its column-header row
 
+    // Find the next non-blank row index after position i
+    function nextNonBlankIdx(from) {
+      for (let j = from + 1; j < rows.length; j++) {
+        if (rows[j].some(v => String(v ?? '').trim())) return j;
+      }
+      return -1;
+    }
+
     for (let i = headerIdx + 1; i < rows.length; i++) {
       const rawRow = rows[i];
 
@@ -137,8 +145,19 @@ const Accounts = (() => {
       const allCellVals = rawRow.map(v => String(v ?? '').trim()).filter(Boolean);
       if (allCellVals.length === 0) continue;
 
-      // Check if this row is a section header (HDFC / NEFT / HOLD / CHEQUE)
-      const section = detectSection(rawRow);
+      // Check if this row is a section header (HDFC / NEFT / HOLD / CHEQUE / OTHERS / etc.)
+      // Keyword match first; fallback: ≤3 non-empty cells AND next non-blank row is a
+      // column-header — catches arbitrary labels like "REMAING PAY-1", "OTHERS", etc.
+      let section = detectSection(rawRow);
+      if (section === null && allCellVals.length <= 3) {
+        const nextIdx = nextNonBlankIdx(i);
+        if (nextIdx >= 0) {
+          const nextMapped = mapColumns(rows[nextIdx].map(v => String(v ?? '')));
+          if (nextMapped.accountNo !== undefined || nextMapped.empCode !== undefined) {
+            section = allCellVals[0].toUpperCase();
+          }
+        }
+      }
       if (section !== null) {
         currentSection = section;
         skipNextNonBlank = true; // the next non-blank row is the column-header for this section
