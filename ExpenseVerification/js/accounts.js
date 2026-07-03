@@ -18,7 +18,7 @@ const Accounts = (() => {
     netPay:      ['netpay','net pay','net_pay','net amount','net salary','amount','salary',
                   'net sal','sal amount'],
     pan:         ['pan','pan no','pan number','pan_no','pan card','pancard'],
-    ifsc:        ['ifsc','ifsc code','ifsc_code','ifsc no'],
+    ifsc:        ['ifsc','ifsc code','ifsc_code','ifsc no','ifsccode','ifsc_no'],
     nameInBank:  ['name in bank','nameinbank','name_in_bank','account name','ac name',
                   'bank account name','beneficiary name'],
     department:  ['department','dept','division','dept name','department name'],
@@ -149,8 +149,10 @@ const Accounts = (() => {
         skipNextNonBlank = false;
         const rowHeaders = rawRow.map(v => String(v ?? ''));
         const reMapped = mapColumns(rowHeaders);
-        // Update colMap if this row really is a header, then skip it
-        if (Object.keys(reMapped).length >= 2) colMap = reMapped;
+        // Merge: keep existing colMap entries for any field not found in reMapped
+        if (Object.keys(reMapped).length >= 2) {
+          colMap = { ...colMap, ...reMapped };
+        }
         continue; // always skip the row immediately after a section header
       }
 
@@ -160,7 +162,7 @@ const Accounts = (() => {
       if (nonEmptyHdrs >= 3) {
         const reMapped2 = mapColumns(rowHeaders2);
         if (reMapped2.accountNo !== undefined || reMapped2.empCode !== undefined) {
-          colMap = reMapped2;
+          colMap = { ...colMap, ...reMapped2 };
           continue;
         }
       }
