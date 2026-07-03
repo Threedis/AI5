@@ -648,6 +648,12 @@
   let _colMap            = {};
   let _currentStep       = 1;
 
+  /* Declare these here so loadViewTab() (called inside loadActiveVersionInfo)
+     can access them without hitting the temporal dead zone. */
+  const PAGE_SIZE  = 50;
+  let _viewPage    = 1;
+  let _viewRecords = [];
+
   /* ── Load active version info ────────────────────────────── */
   async function loadActiveVersionInfo() {
     const latest = await HR.getLatestVersion();
@@ -662,7 +668,7 @@
     await loadVersionHistory();
   }
 
-  await loadActiveVersionInfo();
+  try { await loadActiveVersionInfo(); } catch (e) { console.warn('[HR] Init load error:', e); }
 
   /* ── Upload zone interactions ────────────────────────────── */
   const zone      = document.getElementById('hr-upload-zone');
@@ -922,7 +928,6 @@
 
   /* ── Preview table with pagination ──────────────────────── */
   let _previewPage = 1;
-  const PAGE_SIZE  = 50;
 
   function renderPreviewTable(records, errRows, warnRows, filter = '', errOnly = false) {
     let filtered = records;
@@ -1229,8 +1234,6 @@
   };
 
   /* ── View Database Tab ───────────────────────────────────── */
-  let _viewPage    = 1;
-  let _viewRecords = [];
 
   async function loadViewTab() {
     _viewRecords = await Database.getAll('hrMaster');
