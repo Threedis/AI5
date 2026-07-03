@@ -19,8 +19,8 @@ const HR = (() => {
     nameInBank:        ['name in bank','bank account name','account holder name','name as in bank','name_in_bank','beneficiary name','holder name']
   };
 
-  const REQUIRED_COLUMNS = ['employeeId','employeeName','bankAccountNumber','ifsc'];
-  const OPTIONAL_COLUMNS = ['month','year','branch','division','bankName','nameInBank'];
+  const REQUIRED_COLUMNS = ['employeeId','employeeName'];
+  const OPTIONAL_COLUMNS = ['month','year','branch','division','bankName','bankAccountNumber','ifsc','nameInBank'];
 
   /* ── Parse SheetJS workbook to raw records ───────────────── */
   function parseSheet(workbook) {
@@ -120,13 +120,13 @@ const HR = (() => {
           message: 'Employee Name is blank', value: '' });
       }
 
-      /* 4. Invalid / blank Account Number */
+      /* 4. Blank / Invalid Account Number — warning only */
       if (Utils.isEmpty(rec.bankAccountNumber)) {
-        errors.push({ row: rowNum, field: 'bankAccountNumber', type: 'BLANK_ACCOUNT',
+        warnings.push({ row: rowNum, field: 'bankAccountNumber', type: 'BLANK_ACCOUNT',
           message: 'Bank Account Number is blank', value: '' });
       } else {
-        /* 5. Duplicate Account Number */
         const acc = rec.bankAccountNumber.trim().replace(/\s/g, '');
+        /* 5. Duplicate Account Number — still an error (data integrity) */
         if (accNumSeen.has(acc)) {
           errors.push({ row: rowNum, field: 'bankAccountNumber', type: 'DUPLICATE_ACCOUNT',
             message: `Duplicate Account Number — first seen at row ${accNumSeen.get(acc)}`,
@@ -134,22 +134,21 @@ const HR = (() => {
         } else {
           accNumSeen.set(acc, rowNum);
         }
-
-        /* 6. Invalid Account Number format */
+        /* 6. Invalid Account Number format — warning only */
         if (!Utils.isValidAccountNumber(acc)) {
-          errors.push({ row: rowNum, field: 'bankAccountNumber', type: 'INVALID_ACCOUNT',
-            message: 'Account number must be 9–18 digits',
+          warnings.push({ row: rowNum, field: 'bankAccountNumber', type: 'INVALID_ACCOUNT',
+            message: 'Account number format looks unusual (expected 9–18 digits)',
             value: rec.bankAccountNumber });
         }
       }
 
-      /* 7. Invalid IFSC */
+      /* 7. Blank / Invalid IFSC — warning only */
       if (Utils.isEmpty(rec.ifsc)) {
-        errors.push({ row: rowNum, field: 'ifsc', type: 'BLANK_IFSC',
+        warnings.push({ row: rowNum, field: 'ifsc', type: 'BLANK_IFSC',
           message: 'IFSC code is blank', value: '' });
       } else if (!Utils.isValidIFSC(rec.ifsc.trim().toUpperCase())) {
-        errors.push({ row: rowNum, field: 'ifsc', type: 'INVALID_IFSC',
-          message: 'IFSC format invalid (expected: XXXX0YYYYYY)',
+        warnings.push({ row: rowNum, field: 'ifsc', type: 'INVALID_IFSC',
+          message: 'IFSC format looks unusual (expected: XXXX0YYYYYY)',
           value: rec.ifsc });
       }
 
