@@ -27,7 +27,7 @@ const Accounts = (() => {
   };
 
   /* ── Section header keywords (HDFC, NEFT, HOLD, CHEQUE etc.) */
-  const SECTION_KEYWORDS = ['hdfc', 'neft', 'hold', 'cheque', 'chq'];
+  const SECTION_KEYWORDS = ['hdfc', 'neft', 'hold', 'cheque', 'chq', 'others', 'other'];
 
   /* ── Rows to skip (totals, cancelled, nil, etc.) ─────────── */
   const SKIP_PATTERNS = [
@@ -55,7 +55,7 @@ const Accounts = (() => {
     return map;
   }
 
-  /* ── Detect if a row is a named section header (HDFC/NEFT/HOLD/CHEQUE) */
+  /* ── Detect if a row is a named section header (HDFC/NEFT/HOLD/CHEQUE/OTHERS) */
   function detectSection(rawRow) {
     const allVals = rawRow.map(v => String(v ?? '').trim().toLowerCase()).filter(Boolean);
     if (allVals.length === 0) return null; // blank row, not a section header
@@ -137,7 +137,7 @@ const Accounts = (() => {
       const allCellVals = rawRow.map(v => String(v ?? '').trim()).filter(Boolean);
       if (allCellVals.length === 0) continue;
 
-      // Check if this row is a section header (HDFC / NEFT / HOLD / CHEQUE)
+      // Check if this row is a section header (HDFC / NEFT / HOLD / CHEQUE / OTHERS)
       const section = detectSection(rawRow);
       if (section !== null) {
         currentSection = section;
