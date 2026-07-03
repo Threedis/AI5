@@ -47,18 +47,17 @@ const HR = (() => {
       if (!hasMandatory) continue;
 
       /* Parse data rows */
-      let firstDataRow = true;
       for (let r = headerRowIdx + 1; r < rows.length; r++) {
         const row = rows[r];
         if (row.every(c => String(c).trim() === '')) continue; // blank row
 
-        /* Skip the first non-blank row after the header if it has no Employee ID
-           — it is a group/count summary row, not an actual employee record. */
-        if (firstDataRow) {
-          firstDataRow = false;
-          const cells = row.map(c => String(c).trim());
-          const empId = colIdx.employeeId !== undefined ? cells[colIdx.employeeId] : '';
-          if (!empId) continue;
+        /* The row immediately after the header with no Employee ID is a
+           group/count summary row — skip it so it never enters validation. */
+        if (r === headerRowIdx + 1) {
+          const empIdVal = colIdx.employeeId !== undefined
+            ? String(row[colIdx.employeeId] ?? '').trim()
+            : '';
+          if (!empIdVal) continue;
         }
 
         const rec = {};
