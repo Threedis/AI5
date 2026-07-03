@@ -177,11 +177,7 @@ const HR = (() => {
           message: 'Division/Department is missing', value: '' });
       }
 
-      /* 10. Missing Name in Bank */
-      if (Utils.isEmpty(rec.nameInBank)) {
-        warnings.push({ row: rowNum, field: 'nameInBank', type: 'MISSING_NAME_IN_BANK',
-          message: 'Name in Bank is missing', value: '' });
-      }
+      /* Name in Bank is not provided in HR Saral exports — no warning */
     });
 
     return { errors, warnings, isValid: errors.length === 0 };
