@@ -91,12 +91,12 @@ const Auth = (() => {
   /* ── Guard: redirect to login if not authenticated ──────── */
   function requireAuth(allowedRoles = null) {
     if (!isLoggedIn()) {
-      window.location.href = 'login.html';
+      window.location.href = 'login.html?reason=session_expired';
       return false;
     }
     const sess = getSession();
     if (allowedRoles && !allowedRoles.includes(sess.role)) {
-      window.location.href = 'dashboard.html';
+      window.location.href = 'dashboard.html?reason=unauthorized';
       return false;
     }
     return true;

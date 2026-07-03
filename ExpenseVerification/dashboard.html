@@ -340,6 +340,13 @@
 
   const sess = Auth.getCurrentUser();
 
+  /* ── Show reason banner if redirected from another page ── */
+  const _params = new URLSearchParams(window.location.search);
+  if (_params.get('reason') === 'unauthorized') {
+    App.Toast.warning('Access Denied', 'You do not have permission to access that page.');
+    history.replaceState(null, '', 'dashboard.html');
+  }
+
   /* ── Bootstrap UI ───────────────────────────────────────── */
   await App.init();
 

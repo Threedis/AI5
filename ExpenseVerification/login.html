@@ -123,7 +123,7 @@
         display:none; background:#FDE8E8; border:1px solid #F5C6C6;
         border-radius:var(--radius-sm); padding:10px 14px; margin-bottom:16px;
         font-size:.825rem; color:var(--accent-red);
-        display:none; align-items:center; gap:8px;">
+        align-items:center; gap:8px;">
         <i class="fa-solid fa-circle-exclamation"></i>
         <span id="login-error-text">Invalid username or password</span>
       </div>
@@ -190,6 +190,12 @@
 <!-- Toast container -->
 <div class="toast-container"></div>
 
+<noscript>
+  <div style="position:fixed;top:0;left:0;right:0;background:#A4262C;color:#fff;padding:14px 20px;text-align:center;font-family:sans-serif;font-size:.9rem;z-index:9999;">
+    ⚠️ JavaScript is required to use this application. Please enable JavaScript and reload the page.
+  </div>
+</noscript>
+
 <!-- CryptoJS -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
 
@@ -220,6 +226,12 @@
   } else if (reason === 'logout') {
     msgEl.classList.add('show');
     msgText.textContent = 'You have been successfully signed out.';
+  } else if (reason === 'unauthorized') {
+    msgEl.classList.add('show', 'warning');
+    msgText.textContent = 'You do not have permission to access that page.';
+  } else if (reason === 'session_expired') {
+    msgEl.classList.add('show', 'warning');
+    msgText.textContent = 'Your session has expired. Please sign in again.';
   }
 
   /* ── Pre-fill remembered username ───────────────────────── */
