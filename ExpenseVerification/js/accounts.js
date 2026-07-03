@@ -255,11 +255,11 @@ const Accounts = (() => {
         accMap.set(rec.accountNo, idx + 1);
       }
 
-      // IFSC
+      // IFSC (optional — blank is allowed)
       if (!rec.ifsc) {
-        errors.push({ row: idx + 1, field: 'ifsc', type: 'BLANK_IFSC', message: 'IFSC code is blank', value: '', rowLabel });
+        warnings.push({ row: idx + 1, field: 'ifsc', type: 'BLANK_IFSC', message: 'IFSC code is blank', value: '', rowLabel });
       } else if (!Utils.isValidIFSC(rec.ifsc)) {
-        errors.push({ row: idx + 1, field: 'ifsc', type: 'INVALID_IFSC', message: 'Invalid IFSC format (should be AAAA0XXXXXX)', value: rec.ifsc, rowLabel });
+        warnings.push({ row: idx + 1, field: 'ifsc', type: 'INVALID_IFSC', message: 'Invalid IFSC format (should be AAAA0XXXXXX)', value: rec.ifsc, rowLabel });
       }
 
       // Employee name
@@ -279,7 +279,7 @@ const Accounts = (() => {
 
       // Name in bank (optional)
       if (!rec.nameInBank) {
-        warnings.push({ row: idx + 1, field: 'nameInBank', type: 'MISSING_NAME_IN_BANK', message: 'Name in bank not provided', value: '', rowLabel });
+        warnings.push({ row: idx + 1, field: 'nameInBank', type: 'MISSING_NAME_IN_BANK', message: 'Name not provided', value: '', rowLabel });
       }
 
       // Bank name (optional)
