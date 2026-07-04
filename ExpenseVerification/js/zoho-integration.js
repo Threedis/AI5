@@ -196,13 +196,24 @@ const ZohoProjects = (() => {
     for (const project of projects) {
       const projectId  = project.id_string || project.id;
       const projPrefix = (project.prefix || project.key || '').toUpperCase();
-      const taskData   = await apiGet(
-        `/portal/${enc(PORTAL_NAME)}/projects/${enc(projectId)}/tasks/`
-      );
-      const task = (taskData.tasks || []).find(t => {
+      let tasks = [];
+      try {
+        const taskData = await apiGet(
+          `/portal/${enc(PORTAL_NAME)}/projects/${enc(projectId)}/tasks/?action=allopentasks`
+        );
+        tasks = taskData.tasks || [];
+        // If open tasks didn't include it, also check closed
+        if (!tasks.length) {
+          const closed = await apiGet(
+            `/portal/${enc(PORTAL_NAME)}/projects/${enc(projectId)}/tasks/?action=closedtasks`
+          );
+          tasks = closed.tasks || [];
+        }
+      } catch { continue; }
+
+      const task = tasks.find(t => {
         if ((t.key       || '').toUpperCase() === upper) return true;
         if ((t.task_key  || '').toUpperCase() === upper) return true;
-        // Construct from project prefix + task sequence number
         const seq = t.sequence_num || t.task_index || '';
         if (projPrefix && seq && `${projPrefix}-T${seq}` === upper) return true;
         return false;
