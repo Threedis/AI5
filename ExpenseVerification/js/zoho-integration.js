@@ -186,35 +186,31 @@ const ZohoProjects = (() => {
   async function resolveDisplayId(displayId) {
     const upper = displayId.toUpperCase();
 
-    // Try portal-wide task list first — tasks include task_key like "S07-T1"
-    const portalData  = await apiGet(`/portal/${enc(PORTAL_NAME)}/tasks/?range=200`);
-    const portalTasks = portalData.tasks || [];
-    const portalMatch = portalTasks.find(t =>
-      (t.key || t.task_key || '').toUpperCase() === upper
-    );
-    if (portalMatch) {
-      const projectId = portalMatch.project?.id_string || portalMatch.project?.id || '';
-      return { task: portalMatch, projectId };
-    }
-
-    // Fallback: iterate each project and search its task list
+    // Get all projects then search each one's task list
     const projData = await apiGet(`/portal/${enc(PORTAL_NAME)}/projects/`);
     const projects  = projData.projects || [];
+
     for (const project of projects) {
-      const projectId = project.id_string || project.id;
-      const taskData  = await apiGet(
-        `/portal/${enc(PORTAL_NAME)}/projects/${enc(projectId)}/tasks/?range=200`
+      const projectId  = project.id_string || project.id;
+      const projPrefix = (project.prefix || project.key || '').toUpperCase();
+      const taskData   = await apiGet(
+        `/portal/${enc(PORTAL_NAME)}/projects/${enc(projectId)}/tasks/`
       );
-      const task = (taskData.tasks || []).find(t =>
-        (t.key || t.task_key || '').toUpperCase() === upper
-      );
+      const task = (taskData.tasks || []).find(t => {
+        if ((t.key       || '').toUpperCase() === upper) return true;
+        if ((t.task_key  || '').toUpperCase() === upper) return true;
+        // Construct from project prefix + task sequence number
+        const seq = t.sequence_num || t.task_index || '';
+        if (projPrefix && seq && `${projPrefix}-T${seq}` === upper) return true;
+        return false;
+      });
       if (task) {
         if (!task.project) task.project = { id_string: projectId, name: project.name };
         return { task, projectId };
       }
     }
 
-    throw new Error(`Task "${displayId}" not found in any project on this portal.`);
+    throw new Error(`Task "${displayId}" not found. Checked ${projects.length} project(s).`);
   }
 
   /* ── Fetch task via direct API ───────────────────────────── */
