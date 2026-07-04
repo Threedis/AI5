@@ -20,7 +20,7 @@
 
 const ZohoProjects = (() => {
 
-  const API_BASE      = 'https://projectsapi.zoho.com/restapi';
+  const API_BASE      = 'https://expense.ajaywilllisten.workers.dev/restapi';
   const ACCOUNTS_URL  = 'https://accounts.zoho.com/oauth/v2/auth';
   const PORTAL_NAME   = 'hbegroupprojects';
   const SCOPE         = 'ZohoProjects.portals.READ,ZohoProjects.tasks.READ,' +
@@ -186,13 +186,11 @@ const ZohoProjects = (() => {
 
   /* ── Resolve display ID (e.g. "S07-T1") → numeric task ──── */
   async function resolveDisplayId(displayId) {
-    // Parse prefix and task sequence: "S07-T1" → prefix="S07", seq=1
     const m = displayId.match(/^([A-Za-z0-9]+)-[Tt](\d+)$/);
     if (!m) return null;
     const prefix = m[1].toUpperCase();
     const seq    = parseInt(m[2], 10);
 
-    // Fetch all projects and find the one matching this prefix
     const projData = await apiGet(`/portal/${enc(PORTAL_NAME)}/projects/`);
     const projects = projData.projects || [];
     const project  = projects.find(p =>
@@ -202,7 +200,6 @@ const ZohoProjects = (() => {
 
     const projectId = project.id_string || project.id;
 
-    // Fetch tasks for this project and find by task_key or sequence
     const taskData = await apiGet(
       `/portal/${enc(PORTAL_NAME)}/projects/${enc(projectId)}/tasks/?range=100`
     );
@@ -222,18 +219,15 @@ const ZohoProjects = (() => {
   async function fetchTask(taskId) {
     const input = taskId.trim();
 
-    // Display ID path: e.g. "S07-T1"
     if (/^[A-Za-z0-9]+-[Tt]\d+$/.test(input)) {
       const resolved = await resolveDisplayId(input);
       if (resolved) {
         const { task, projectId } = resolved;
-        // Attach project info so parseTask can read it
         if (!task.project) task.project = { id_string: projectId };
         return parseTask({ tasks: [task] }, input);
       }
     }
 
-    // Fallback: search by term (works for numeric IDs or task names)
     const data = await apiGet(`/portal/${enc(PORTAL_NAME)}/tasks/?search_term=${enc(input)}`);
     return parseTask(data, input);
   }
