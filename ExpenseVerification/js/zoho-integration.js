@@ -157,6 +157,11 @@ const ZohoProjects = (() => {
     } catch { return []; }
   }
 
+  /* ── Mode label from last server status ─────────────────── */
+  function getMode() {
+    return _serverStatus?.mode || 'unknown';
+  }
+
   /* ── Human-readable summary ──────────────────────────────── */
   function getSummary(parsed) {
     const parts = [];
@@ -172,6 +177,7 @@ const ZohoProjects = (() => {
   return {
     checkServer,
     resetCache,
+    getMode,
     getProxyOrigin,
     fetchTask,
     fetchTaskComments,

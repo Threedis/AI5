@@ -575,7 +575,8 @@
       } else {
         dot.style.background = 'var(--accent-green)';
         label.style.color    = 'var(--accent-green)';
-        label.textContent    = `Connected · Portal: ${status.portalId}`;
+        const modeLabel = status.mode === 'mcp' ? 'MCP' : 'REST';
+        label.textContent    = `Connected via ${modeLabel} · Portal: ${status.portalName || status.portalId}`;
       }
     } catch {
       dot.style.background = 'var(--accent-red)';
