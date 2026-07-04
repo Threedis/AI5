@@ -184,10 +184,58 @@ const ZohoProjects = (() => {
     };
   }
 
+  /* ── Resolve display ID (e.g. "S07-T1") → numeric task ──── */
+  async function resolveDisplayId(displayId) {
+    // Parse prefix and task sequence: "S07-T1" → prefix="S07", seq=1
+    const m = displayId.match(/^([A-Za-z0-9]+)-[Tt](\d+)$/);
+    if (!m) return null;
+    const prefix = m[1].toUpperCase();
+    const seq    = parseInt(m[2], 10);
+
+    // Fetch all projects and find the one matching this prefix
+    const projData = await apiGet(`/portal/${enc(PORTAL_NAME)}/projects/`);
+    const projects = projData.projects || [];
+    const project  = projects.find(p =>
+      (p.key || p.prefix || p.id_string || '').toString().toUpperCase() === prefix
+    );
+    if (!project) throw new Error(`No project found with prefix "${prefix}". Check the task ID.`);
+
+    const projectId = project.id_string || project.id;
+
+    // Fetch tasks for this project and find by task_key or sequence
+    const taskData = await apiGet(
+      `/portal/${enc(PORTAL_NAME)}/projects/${enc(projectId)}/tasks/?range=100`
+    );
+    const tasks = taskData.tasks || [];
+
+    const task = tasks.find(t =>
+      (t.key || '').toUpperCase()      === `${prefix}-T${seq}` ||
+      (t.task_key || '').toUpperCase() === `${prefix}-T${seq}` ||
+      parseInt(t.sequence_num || t.task_index || 0, 10) === seq
+    );
+    if (!task) throw new Error(`Task ${displayId} not found in project "${project.name}".`);
+
+    return { task, projectId };
+  }
+
   /* ── Fetch task via direct API ───────────────────────────── */
   async function fetchTask(taskId) {
-    const data = await apiGet(`/portal/${enc(PORTAL_NAME)}/tasks/?search_term=${enc(taskId)}`);
-    return parseTask(data, taskId);
+    const input = taskId.trim();
+
+    // Display ID path: e.g. "S07-T1"
+    if (/^[A-Za-z0-9]+-[Tt]\d+$/.test(input)) {
+      const resolved = await resolveDisplayId(input);
+      if (resolved) {
+        const { task, projectId } = resolved;
+        // Attach project info so parseTask can read it
+        if (!task.project) task.project = { id_string: projectId };
+        return parseTask({ tasks: [task] }, input);
+      }
+    }
+
+    // Fallback: search by term (works for numeric IDs or task names)
+    const data = await apiGet(`/portal/${enc(PORTAL_NAME)}/tasks/?search_term=${enc(input)}`);
+    return parseTask(data, input);
   }
 
   /* ── Fetch comments via direct API ──────────────────────── */
