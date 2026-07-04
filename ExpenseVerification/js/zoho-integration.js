@@ -296,19 +296,50 @@ const ZohoProjects = (() => {
   async function fetchTask(taskId) {
     const input = taskId.trim();
 
+    let parsed;
+
     // Display ID path: e.g. "S07-T1" or "SO7-T1"
     if (/^[A-Za-z0-9]+-[Tt]\d+$/.test(input)) {
       const resolved = await resolveDisplayId(input);
       if (resolved) {
         const { task, projectId } = resolved;
         if (!task.project) task.project = { id_string: projectId };
-        return parseTask({ tasks: [task] }, input);
+        parsed = parseTask({ tasks: [task] }, input);
       }
     }
 
-    // Fallback: search by term (works for numeric IDs or task names)
-    const data = await apiGet(`/portal/${enc(PORTAL_NAME)}/tasks/?search_term=${enc(input)}`);
-    return parseTask(data, input);
+    if (!parsed) {
+      // Fallback: search by term (works for numeric IDs or task names)
+      const data = await apiGet(`/portal/${enc(PORTAL_NAME)}/tasks/?search_term=${enc(input)}`);
+      parsed = parseTask(data, input);
+    }
+
+    // Enrich with comments and attachments in parallel
+    const [comments, attachments] = await Promise.all([
+      fetchTaskComments(parsed.taskId, parsed.projectId),
+      fetchTaskAttachments(parsed.taskId, parsed.projectId),
+    ]);
+
+    parsed.comments    = comments;
+    parsed.attachments = attachments.map(a => ({ ...a, kind: classifyAttachment(a) }));
+
+    // If task status alone is not conclusive, check comments for approval signals
+    const commentApproval = deriveCommentApproval(comments);
+    if (commentApproval.status && parsed.approvalStatus !== 'approved' && parsed.approvalStatus !== 'rejected') {
+      parsed.approvalStatus = commentApproval.status;
+    }
+    const allApprovers = new Set([...parsed.approvers, ...commentApproval.approvers]);
+    parsed.approvers   = [...allApprovers];
+
+    // Track which sources contributed evidence
+    const evidenceSources = [];
+    if (parsed.status) evidenceSources.push('task-status');
+    if (comments.length) evidenceSources.push('comments');
+    const imageEvidence = parsed.attachments.filter(a => ['whatsapp','screenshot','email','approval-doc','image'].includes(a.kind));
+    if (imageEvidence.length) evidenceSources.push('attachments');
+    parsed.evidenceSources = evidenceSources;
+
+    return parsed;
   }
 
   /* ── Fetch comments via direct API ──────────────────────── */
@@ -322,6 +353,47 @@ const ZohoProjects = (() => {
         createdAt: c.time_long || c.added_time_string || '',
       }));
     } catch { return []; }
+  }
+
+  /* ── Fetch task attachments (file names only) ────────────── */
+  async function fetchTaskAttachments(taskId, projectId) {
+    if (!projectId) return [];
+    try {
+      const data = await apiGet(`/portal/${enc(PORTAL_NAME)}/projects/${enc(projectId)}/tasks/${enc(taskId)}/attachments/`);
+      return (data.attachments || []).map(a => ({
+        name:      a.filename || a.file_name || a.name || '',
+        size:      a.filesize || a.file_size || 0,
+        createdAt: a.created_time_string || '',
+        url:       a.download_url || a.url || '',
+        isImage:   /\.(jpe?g|png|gif|webp|bmp|heic)$/i.test(a.filename || a.file_name || ''),
+      }));
+    } catch { return []; }
+  }
+
+  /* ── Derive approval from comment text ─────────────────── */
+  const APPROVAL_POSITIVE = /\bapprov(ed|al|e)\b|\bsanction(ed)?\b|\bauthori[sz]ed?\b|\bcleared?\b|\bok(?:ay)?\b|\bverified?\b|\baccept(ed)?\b|\bpaid\b/i;
+  const APPROVAL_NEGATIVE = /\breject(ed)?\b|\bdenied?\b|\bdeclined?\b|\bcancell?ed?\b|\bdo\s+not\s+approv/i;
+
+  function deriveCommentApproval(comments) {
+    let status   = null;
+    const names  = new Set();
+    for (const c of comments) {
+      const txt = c.content || '';
+      if (APPROVAL_NEGATIVE.test(txt)) { status = 'rejected'; if (c.author) names.add(c.author); break; }
+      if (APPROVAL_POSITIVE.test(txt)) { status = 'approved'; if (c.author) names.add(c.author); }
+    }
+    return { status, approvers: [...names] };
+  }
+
+  /* ── Classify attachments as approval evidence ───────────── */
+  function classifyAttachment(att) {
+    const n = (att.name || '').toLowerCase();
+    if (/whatsapp/i.test(n))                              return 'whatsapp';
+    if (/screenshot|screen.?shot|screen.?grab/i.test(n)) return 'screenshot';
+    if (/mail|email|outlook|gmail/i.test(n))              return 'email';
+    if (/approval|approved|sanction/i.test(n))            return 'approval-doc';
+    if (att.isImage)                                      return 'image';
+    return 'other';
   }
 
   const enc = encodeURIComponent;
@@ -348,8 +420,11 @@ const ZohoProjects = (() => {
     clearClientId,
     fetchTask,
     fetchTaskComments,
+    fetchTaskAttachments,
     getSummary,
     parseTask,
+    deriveCommentApproval,
+    classifyAttachment,
   };
 
 })();
