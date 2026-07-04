@@ -205,10 +205,40 @@
 
               <!-- ── Zoho Task ID panel ── -->
               <div id="zoho-panel">
-                <!-- Proxy server status indicator -->
-                <div id="zoho-proxy-status" style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:var(--radius-sm);font-size:.78rem;margin-bottom:12px;background:var(--bg);border:1px solid var(--border)">
-                  <span id="zoho-proxy-dot" style="width:8px;height:8px;border-radius:50%;background:var(--text-muted);flex-shrink:0"></span>
-                  <span id="zoho-proxy-label" style="color:var(--text-muted)">Checking proxy…</span>
+
+                <!-- OAuth connection status bar -->
+                <div id="zoho-auth-bar" style="margin-bottom:12px;border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden">
+
+                  <!-- Connected state -->
+                  <div id="zoho-auth-connected" style="display:none;align-items:center;gap:8px;padding:8px 12px;font-size:.78rem">
+                    <span style="width:8px;height:8px;border-radius:50%;background:var(--accent-green);flex-shrink:0"></span>
+                    <span style="flex:1;color:var(--accent-green)">Connected to Zoho · Portal: hbegroupprojects</span>
+                    <button id="btn-zoho-disconnect" style="border:none;background:none;font-size:.75rem;color:var(--text-muted);cursor:pointer;padding:2px 6px;border-radius:4px">Disconnect</button>
+                  </div>
+
+                  <!-- Not connected state -->
+                  <div id="zoho-auth-disconnected" style="display:none">
+                    <!-- Client ID input (shown only if no client ID saved) -->
+                    <div id="zoho-clientid-row" style="display:none;padding:8px 12px;border-bottom:1px solid var(--border);background:var(--bg)">
+                      <div style="font-size:.75rem;color:var(--text-muted);margin-bottom:6px">
+                        Enter your Zoho API <strong>Client ID</strong> to enable Zoho sign-in.
+                        <a href="https://api-console.zoho.com/" target="_blank" rel="noopener" style="color:var(--primary)">Get one at api-console.zoho.com</a>
+                      </div>
+                      <div style="display:flex;gap:6px">
+                        <input type="text" id="zoho-client-id-input" class="form-control" placeholder="Client ID…" style="flex:1;font-size:.8rem;font-family:var(--font-mono)">
+                        <button id="btn-save-client-id" class="btn btn-outline btn-sm">Save</button>
+                      </div>
+                    </div>
+                    <!-- Connect button -->
+                    <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--bg)">
+                      <span style="width:8px;height:8px;border-radius:50%;background:var(--accent-red);flex-shrink:0"></span>
+                      <span style="flex:1;font-size:.78rem;color:var(--text-muted)">Not connected to Zoho</span>
+                      <button id="btn-zoho-connect" class="btn btn-primary btn-sm">
+                        <i class="fa-solid fa-right-to-bracket"></i> Connect to Zoho
+                      </button>
+                    </div>
+                  </div>
+
                 </div>
 
                 <div style="display:flex;gap:8px;margin-bottom:12px">
@@ -524,7 +554,7 @@
   ══════════════════════════════════════════════════════════ */
   let pdfFile      = null;
   let pdfParsed    = null;
-  let verifyResults = null;
+  let verifyResults = null; // current results array
   let verifyPage   = 1;
   const PAGE_SIZE  = 50;
   let vFiltered    = [];
@@ -533,8 +563,8 @@
   /* ══════════════════════════════════════════════════════════
      APPROVAL SOURCE MODE TOGGLE
   ══════════════════════════════════════════════════════════ */
-  let approvalMode = 'zoho';
-  let zohoTask = null;
+  let approvalMode = 'zoho'; // 'zoho' | 'pdf'
+  let zohoTask = null; // parsed Zoho task
 
   const btnModeZoho = document.getElementById('btn-mode-zoho');
   const btnModePdf  = document.getElementById('btn-mode-pdf');
@@ -555,35 +585,48 @@
   btnModeZoho.addEventListener('click', () => setApprovalMode('zoho'));
   btnModePdf.addEventListener('click',  () => setApprovalMode('pdf'));
 
-  /* ── Zoho proxy status indicator ───────────────────────── */
-  (async function initZohoProxyStatus() {
-    const dot   = document.getElementById('zoho-proxy-dot');
-    const label = document.getElementById('zoho-proxy-label');
-    const btn   = document.getElementById('btn-zoho-search');
-    try {
-      const status = await ZohoProjects.checkServer();
-      if (status.offline) {
-        dot.style.background = 'var(--accent-red)';
-        label.style.color    = 'var(--accent-red)';
-        label.textContent    = 'Zoho proxy offline — run: npm install && node server.js';
-        btn.disabled = true;
-      } else if (!status.configured) {
-        dot.style.background = 'var(--accent-orange)';
-        label.style.color    = 'var(--accent-orange)';
-        label.textContent    = 'Proxy running — set ZOHO_MCP_CMD or ZOHO_ACCESS_TOKEN';
-        btn.disabled = true;
-      } else {
-        dot.style.background = 'var(--accent-green)';
-        label.style.color    = 'var(--accent-green)';
-        const modeLabel = status.mode === 'mcp' ? 'MCP' : 'REST';
-        label.textContent    = `Connected via ${modeLabel} · Portal: ${status.portalName || status.portalId}`;
-      }
-    } catch {
-      dot.style.background = 'var(--accent-red)';
-      label.textContent    = 'Could not reach proxy server';
-      btn.disabled = true;
+  /* ── Zoho OAuth connection UI ──────────────────────────── */
+  // Handle OAuth redirect callback (token arrives in URL hash)
+  ZohoProjects.handleOAuthCallback();
+
+  function refreshZohoAuthUI() {
+    const connected    = document.getElementById('zoho-auth-connected');
+    const disconnected = document.getElementById('zoho-auth-disconnected');
+    const clientIdRow  = document.getElementById('zoho-clientid-row');
+    const searchBtn    = document.getElementById('btn-zoho-search');
+
+    if (ZohoProjects.isConnected()) {
+      connected.style.display    = 'flex';
+      disconnected.style.display = 'none';
+      searchBtn.disabled = false;
+    } else {
+      connected.style.display    = 'none';
+      disconnected.style.display = 'block';
+      searchBtn.disabled = true;
+      // Show client ID input only when no client ID is stored yet
+      clientIdRow.style.display = ZohoProjects.getClientId() ? 'none' : 'block';
     }
-  })();
+  }
+
+  refreshZohoAuthUI();
+
+  document.getElementById('btn-zoho-connect').addEventListener('click', () => {
+    try { ZohoProjects.connect(); }
+    catch (e) { App.Toast.error('Zoho Connect', e.message); }
+  });
+
+  document.getElementById('btn-zoho-disconnect').addEventListener('click', () => {
+    ZohoProjects.disconnect();
+    refreshZohoAuthUI();
+  });
+
+  document.getElementById('btn-save-client-id').addEventListener('click', () => {
+    const val = document.getElementById('zoho-client-id-input').value.trim();
+    if (!val) { App.Toast.warning('Client ID', 'Please enter a Client ID.'); return; }
+    ZohoProjects.setClientId(val);
+    refreshZohoAuthUI();
+    App.Toast.success('Client ID saved', 'Now click "Connect to Zoho" to authenticate.');
+  });
 
   /* ── Zoho Task Search ───────────────────────────────────── */
   async function doZohoSearch() {
@@ -705,6 +748,7 @@
     const statusIcon  = { approved:'fa-circle-check', rejected:'fa-circle-xmark', pending:'fa-clock', unknown:'fa-circle-question' }[parsed.approvalStatus] || 'fa-circle-question';
     const statusLabel = Utils.titleCase(parsed.approvalStatus);
 
+    // Normalise: Zoho task fields vs PDF fields
     const isZoho     = source === 'zoho';
     const taskRef    = isZoho ? parsed.taskId   : parsed.taskNo;
     const taskLabel  = isZoho ? parsed.taskName : null;
@@ -748,7 +792,7 @@
       </div>`;
   }
 
-  /* ── Emp quick-check table ──────────────────────────────── */
+  /* ── Emp quick-check table (used by both Zoho and PDF) ──── */
   async function renderPdfEmpTable(parsed) {
     const hrAll  = await Database.getAll('hrMaster');
     const accAll = await Database.getAll('accountsMaster');
@@ -811,6 +855,7 @@
         filterEmpIds: meta.filterEmpIds || null,
       });
 
+      // Save session
       await Verification.saveSession(results, summary, {
         createdBy: sess.username,
         source:    meta.source  || 'manual',
@@ -874,6 +919,7 @@
       const hr  = r.hr  || {};
       const acc = r.acc || {};
 
+      // Build diff cells
       const accNoMatch = hr.bankAccountNumber && acc.accountNo &&
         hr.bankAccountNumber.replace(/\D/g,'') === acc.accountNo.replace(/\D/g,'');
       const ifscMatch  = hr.ifsc && acc.ifsc && hr.ifsc.toUpperCase() === acc.ifsc.toUpperCase();
@@ -911,6 +957,7 @@
     renderPagination('verify-pagination', verifyPage, pages, p => { verifyPage = p; renderVerifyTable(); });
   }
 
+  /* ── Verify filters ─────────────────────────────────────── */
   function applyVerifyFilters() {
     if (!verifyResults) return;
     const q   = document.getElementById('verify-filter').value.toLowerCase();
@@ -928,6 +975,7 @@
   document.getElementById('verify-filter').addEventListener('input',        Utils.debounce(applyVerifyFilters, 250));
   document.getElementById('verify-status-filter').addEventListener('change', applyVerifyFilters);
 
+  /* ── Download buttons ───────────────────────────────────── */
   document.getElementById('btn-dl-excel').addEventListener('click', async () => {
     if (!verifyResults) { App.Toast.warning('No Data', 'Run verification first.'); return; }
     try { App.Loader.show('Generating report…'); await Verification.generateDiscrepancyReport(verifyResults); App.Loader.hide(); }
@@ -1004,6 +1052,7 @@
   document.getElementById('search-hr-only').addEventListener('change',  () => renderSearchResults(searchResults));
   document.getElementById('search-acc-only').addEventListener('change', () => renderSearchResults(searchResults));
 
+  /* ── Also wire global header search ────────────────────── */
   document.getElementById('global-search-input').addEventListener('keydown', e => {
     if (e.key === 'Enter' && e.target.value.trim()) {
       document.getElementById('global-emp-search').value = e.target.value.trim();
@@ -1154,13 +1203,17 @@
       <span class="page-info">Page ${cur} of ${total}</span>`;
   }
 
+  /* ── URL param: ?search=... ─────────────────────────────── */
   const urlSearch = new URLSearchParams(window.location.search).get('search');
   if (urlSearch) {
     document.getElementById('global-emp-search').value = urlSearch;
     await doSearch();
   }
 
+  /* ── Initial mode ───────────────────────────────────────── */
   setApprovalMode('zoho');
+
+  /* ── Initial load ───────────────────────────────────────── */
   await loadHistory();
   await Audit.log({ module: 'Verification', action: 'PageView', status: 'success' });
 
