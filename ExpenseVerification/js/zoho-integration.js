@@ -29,12 +29,10 @@ const ZohoProjects = (() => {
   const TOKEN_KEY     = 'zoho_token';
   const CLIENT_ID_KEY = 'zoho_client_id';
 
-  /* ── Client ID (stored by user in localStorage) ─────────── */
   function getClientId()   { return localStorage.getItem(CLIENT_ID_KEY) || ''; }
   function setClientId(id) { localStorage.setItem(CLIENT_ID_KEY, id.trim()); }
   function clearClientId() { localStorage.removeItem(CLIENT_ID_KEY); }
 
-  /* ── Token management ────────────────────────────────────── */
   function getToken() {
     try {
       const raw = sessionStorage.getItem(TOKEN_KEY);
@@ -53,10 +51,8 @@ const ZohoProjects = (() => {
   }
 
   function clearToken() { sessionStorage.removeItem(TOKEN_KEY); }
-
   function isConnected() { return !!getToken(); }
 
-  /* ── OAuth callback — call on page load ──────────────────── */
   function handleOAuthCallback() {
     if (!location.hash) return false;
     const params = new URLSearchParams(location.hash.replace(/^#/, ''));
@@ -68,7 +64,6 @@ const ZohoProjects = (() => {
     return true;
   }
 
-  /* ── Initiate OAuth redirect ─────────────────────────────── */
   function connect() {
     const clientId = getClientId();
     if (!clientId) throw new Error('Enter your Zoho Client ID first.');
@@ -86,7 +81,6 @@ const ZohoProjects = (() => {
 
   function disconnect() { clearToken(); }
 
-  /* ── Zoho Projects REST API call ─────────────────────────── */
   async function apiGet(path) {
     const token = getToken();
     if (!token) throw new Error('Not connected. Click "Connect to Zoho" to authenticate.');
@@ -104,7 +98,6 @@ const ZohoProjects = (() => {
     return res.json();
   }
 
-  /* ── Approval status derivation ──────────────────────────── */
   function deriveApprovalStatus(task) {
     const s = (task.status?.name || task.status || '').toLowerCase();
     if (/complet|done|approv|clear|paid/i.test(s))   return 'approved';
@@ -113,7 +106,6 @@ const ZohoProjects = (() => {
     return 'unknown';
   }
 
-  /* ── Extract approvers from task object ──────────────────── */
   function extractApprovers(task) {
     const names = new Set();
     (task.details?.owners || []).forEach(o => { if (o.display_name) names.add(o.display_name); });
@@ -126,14 +118,12 @@ const ZohoProjects = (() => {
     return [...names];
   }
 
-  /* ── Extract employee IDs from task text ─────────────────── */
   function extractEmpIds(task) {
     const text = [
       task.name || '',
       task.description || '',
       ...(task.custom_fields || []).map(cf => String(cf.value || '')),
     ].join(' ');
-
     const patterns = [
       /\bEMP[-_/]?\d{3,8}\b/gi,
       /\bE[-_]?\d{4,8}\b/gi,
@@ -148,7 +138,6 @@ const ZohoProjects = (() => {
     return [...ids];
   }
 
-  /* ── Parse a raw Zoho task object into our approval shape ── */
   function parseTask(raw, taskId) {
     const task = Array.isArray(raw.tasks) ? raw.tasks[0] : (raw.task || raw);
     if (!task || (!task.id && !task.id_string)) throw new Error(`Task ${taskId} not found in Zoho Projects.`);
@@ -184,7 +173,6 @@ const ZohoProjects = (() => {
     };
   }
 
-  /* ── Resolve display ID (e.g. "S07-T1") → numeric task ──── */
   async function resolveDisplayId(displayId) {
     const m = displayId.match(/^([A-Za-z0-9]+)-[Tt](\d+)$/);
     if (!m) return null;
@@ -193,10 +181,15 @@ const ZohoProjects = (() => {
 
     const projData = await apiGet(`/portal/${enc(PORTAL_NAME)}/projects/`);
     const projects = projData.projects || [];
-    const project  = projects.find(p =>
-      (p.key || p.prefix || p.id_string || '').toString().toUpperCase() === prefix
-    );
-    if (!project) throw new Error(`No project found with prefix "${prefix}". Check the task ID.`);
+
+    const project = projects.find(p => {
+      const candidates = [p.key, p.prefix, p.id_string, p.name].filter(Boolean);
+      return candidates.some(v => v.toString().toUpperCase() === prefix);
+    });
+    if (!project) {
+      const available = projects.map(p => p.prefix || p.key || p.name || p.id_string).filter(Boolean).join(', ');
+      throw new Error(`No project found with prefix "${prefix}". Available: ${available || 'none'}`);
+    }
 
     const projectId = project.id_string || project.id;
 
@@ -215,7 +208,6 @@ const ZohoProjects = (() => {
     return { task, projectId };
   }
 
-  /* ── Fetch task via direct API ───────────────────────────── */
   async function fetchTask(taskId) {
     const input = taskId.trim();
 
@@ -232,7 +224,6 @@ const ZohoProjects = (() => {
     return parseTask(data, input);
   }
 
-  /* ── Fetch comments via direct API ──────────────────────── */
   async function fetchTaskComments(taskId, projectId) {
     if (!projectId) return [];
     try {
@@ -247,7 +238,6 @@ const ZohoProjects = (() => {
 
   const enc = encodeURIComponent;
 
-  /* ── Human-readable summary ──────────────────────────────── */
   function getSummary(parsed) {
     const parts = [];
     if (parsed.approvalStatus !== 'unknown') parts.push(`Status: ${Utils.titleCase(parsed.approvalStatus)}`);
