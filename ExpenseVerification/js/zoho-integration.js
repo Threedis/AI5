@@ -187,30 +187,52 @@ const ZohoProjects = (() => {
     };
   }
 
-  /* ── Fetch tasks from one tasklist (open + closed) ──────── */
+  /* ── Fetch tasks from one tasklist, trying several param combos */
   async function fetchTasklistTasks(projectId, tlId) {
-    const tasks = [];
-    for (const status of ['open', 'closed']) {
+    const base = `/portal/${enc(PORTAL_NAME)}/projects/${enc(projectId)}/tasklists/${enc(tlId)}/tasks/`;
+    const attempts = [
+      base,                         // no params
+      `${base}?type=open_tasks`,
+      `${base}?type=closed_tasks`,
+      `${base}?status=open`,
+      `${base}?status=closed`,
+    ];
+    for (const url of attempts) {
       try {
-        const data = await apiGet(
-          `/portal/${enc(PORTAL_NAME)}/projects/${enc(projectId)}/tasklists/${enc(tlId)}/tasks/?status=${status}`
-        );
-        tasks.push(...(data.tasks || []));
-      } catch { /* skip */ }
+        const data = await apiGet(url);
+        if (data.tasks) return data.tasks;
+      } catch { /* try next variant */ }
     }
-    return tasks;
+    return [];
   }
 
   /* ── Fetch all tasks for a project via task lists ────────── */
   async function fetchAllTasks(projectId) {
-    const listData = await apiGet(
-      `/portal/${enc(PORTAL_NAME)}/projects/${enc(projectId)}/tasklists/`
-    );
+    // Try project-level endpoint first (faster, one call)
+    for (const type of ['open_tasks', 'closed_tasks', '']) {
+      try {
+        const q    = type ? `?type=${type}` : '';
+        const data = await apiGet(`/portal/${enc(PORTAL_NAME)}/projects/${enc(projectId)}/tasks/${q}`);
+        if (data.tasks && data.tasks.length) {
+          console.debug(`[Zoho] project ${projectId} tasks via project endpoint (${type||'bare'}): ${data.tasks.length}`);
+          // If open-only, also grab closed
+          if (type === 'open_tasks') {
+            try {
+              const closed = await apiGet(`/portal/${enc(PORTAL_NAME)}/projects/${enc(projectId)}/tasks/?type=closed_tasks`);
+              return [...data.tasks, ...(closed.tasks || [])];
+            } catch { return data.tasks; }
+          }
+          return data.tasks;
+        }
+      } catch { /* try next */ }
+    }
+
+    // Fall back: iterate task lists
+    const listData = await apiGet(`/portal/${enc(PORTAL_NAME)}/projects/${enc(projectId)}/tasklists/`);
     const tasklists = listData.tasklists || [];
     const all = [];
     for (const tl of tasklists) {
-      const tlId = tl.id_string || tl.id;
-      const tasks = await fetchTasklistTasks(projectId, tlId);
+      const tasks = await fetchTasklistTasks(projectId, tl.id_string || tl.id);
       all.push(...tasks);
     }
     return all;
