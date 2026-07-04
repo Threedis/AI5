@@ -1,41 +1,108 @@
 /**
- * zoho-integration.js — Zoho Projects client via local MCP proxy.
+ * zoho-integration.js — Direct Zoho Projects client using OAuth implicit flow.
  *
- * All Zoho API calls go through the local Node.js proxy server (server.js),
- * which holds the OAuth access token in an environment variable.
- * The browser never handles Zoho credentials directly.
+ * No proxy server required. The browser authenticates with Zoho via OAuth 2.0
+ * implicit grant (response_type=token) and calls the Zoho Projects REST API
+ * directly. The access token is stored in sessionStorage.
  *
- * Proxy endpoints (served by ExpenseVerification/server.js):
- *   GET /api/zoho/status              → { configured, portalId, hasProject }
- *   GET /api/zoho/task/:taskId        → raw Zoho task JSON
- *   GET /api/zoho/comments/:taskId/:projectId  → raw Zoho comments JSON
+ * Prerequisites (one-time setup by admin):
+ *   1. Create a Zoho API Console app at https://api-console.zoho.com/
+ *      - Client type: "JavaScript Client"
+ *      - Authorised redirect URI: this page's URL
+ *        (e.g. https://threedis.github.io/RCMS/ExpenseVerification/user.html)
+ *   2. Enter the Client ID in the settings panel in the app.
+ *      (Client Secret is NOT required for implicit flow.)
+ *
+ * Token lifecycle:
+ *   - Stored in sessionStorage; clears on tab/browser close.
+ *   - Zoho implicit tokens expire in 1 hour; the UI prompts reconnect on expiry.
  */
 
 const ZohoProjects = (() => {
 
-  /* Proxy origin — same host when running via server.js, or override via
-     localStorage key 'evs_zoho_proxy' for a remote deployment.           */
-  function getProxyOrigin() {
-    try { return localStorage.getItem('evs_zoho_proxy') || 'http://localhost:3000'; }
-    catch { return 'http://localhost:3000'; }
-  }
+  const API_BASE      = 'https://projectsapi.zoho.com/restapi';
+  const ACCOUNTS_URL  = 'https://accounts.zoho.com/oauth/v2/auth';
+  const PORTAL_NAME   = 'hbegroupprojects';
+  const SCOPE         = 'ZohoProjects.portals.READ,ZohoProjects.tasks.READ,' +
+                        'ZohoProjects.tasklists.READ,ZohoProjects.projects.READ,' +
+                        'ZohoProjects.comments.READ';
+  const TOKEN_KEY     = 'zoho_token';
+  const CLIENT_ID_KEY = 'zoho_client_id';
 
-  let _serverStatus = null; // cached { configured, portalId, hasProject } | null
+  /* ── Client ID (stored by user in localStorage) ─────────── */
+  function getClientId()   { return localStorage.getItem(CLIENT_ID_KEY) || ''; }
+  function setClientId(id) { localStorage.setItem(CLIENT_ID_KEY, id.trim()); }
+  function clearClientId() { localStorage.removeItem(CLIENT_ID_KEY); }
 
-  /* ── Server connectivity check ──────────────────────────── */
-  async function checkServer() {
-    if (_serverStatus) return _serverStatus;
+  /* ── Token management ────────────────────────────────────── */
+  function getToken() {
     try {
-      const res = await fetch(`${getProxyOrigin()}/api/zoho/status`, { signal: AbortSignal.timeout(3000) });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      _serverStatus = await res.json();
-    } catch {
-      _serverStatus = { configured: false, portalId: null, hasProject: false, offline: true };
-    }
-    return _serverStatus;
+      const raw = sessionStorage.getItem(TOKEN_KEY);
+      if (!raw) return null;
+      const d = JSON.parse(raw);
+      if (Date.now() >= d.expiresAt) { sessionStorage.removeItem(TOKEN_KEY); return null; }
+      return d.token;
+    } catch { return null; }
   }
 
-  function resetCache() { _serverStatus = null; }
+  function storeToken(token, expiresIn) {
+    sessionStorage.setItem(TOKEN_KEY, JSON.stringify({
+      token,
+      expiresAt: Date.now() + (parseInt(expiresIn, 10) - 60) * 1000,
+    }));
+  }
+
+  function clearToken() { sessionStorage.removeItem(TOKEN_KEY); }
+
+  function isConnected() { return !!getToken(); }
+
+  /* ── OAuth callback — call on page load ──────────────────── */
+  function handleOAuthCallback() {
+    if (!location.hash) return false;
+    const params = new URLSearchParams(location.hash.replace(/^#/, ''));
+    const token     = params.get('access_token');
+    const expiresIn = params.get('expires_in') || '3600';
+    if (!token) return false;
+    storeToken(token, expiresIn);
+    history.replaceState(null, '', location.pathname + location.search);
+    return true;
+  }
+
+  /* ── Initiate OAuth redirect ─────────────────────────────── */
+  function connect() {
+    const clientId = getClientId();
+    if (!clientId) throw new Error('Enter your Zoho Client ID first.');
+    const redirectUri = location.href.split('#')[0].split('?')[0];
+    const params = new URLSearchParams({
+      response_type: 'token',
+      client_id:     clientId,
+      scope:         SCOPE,
+      redirect_uri:  redirectUri,
+      prompt:        'consent',
+      access_type:   'online',
+    });
+    location.href = `${ACCOUNTS_URL}?${params}`;
+  }
+
+  function disconnect() { clearToken(); }
+
+  /* ── Zoho Projects REST API call ─────────────────────────── */
+  async function apiGet(path) {
+    const token = getToken();
+    if (!token) throw new Error('Not connected. Click "Connect to Zoho" to authenticate.');
+    const res = await fetch(`${API_BASE}${path}`, {
+      headers: { 'Authorization': `Zoho-oauthtoken ${token}` },
+    });
+    if (res.status === 401) {
+      clearToken();
+      throw new Error('Zoho session expired. Click "Connect to Zoho" to reconnect.');
+    }
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.error?.message || body.message || `Zoho API error ${res.status}`);
+    }
+    return res.json();
+  }
 
   /* ── Approval status derivation ──────────────────────────── */
   function deriveApprovalStatus(task) {
@@ -86,8 +153,8 @@ const ZohoProjects = (() => {
     const task = Array.isArray(raw.tasks) ? raw.tasks[0] : (raw.task || raw);
     if (!task || (!task.id && !task.id_string)) throw new Error(`Task ${taskId} not found in Zoho Projects.`);
 
-    const empIds     = extractEmpIds(task);
-    const approvers  = extractApprovers(task);
+    const empIds    = extractEmpIds(task);
+    const approvers = extractApprovers(task);
     const summaryProvider = task.created_by?.display_name || task.created_by || '';
 
     const customMap = {};
@@ -117,38 +184,17 @@ const ZohoProjects = (() => {
     };
   }
 
-  /* ── Fetch task via proxy ────────────────────────────────── */
+  /* ── Fetch task via direct API ───────────────────────────── */
   async function fetchTask(taskId) {
-    const origin = getProxyOrigin();
-    let res;
-    try {
-      res = await fetch(`${origin}/api/zoho/task/${encodeURIComponent(taskId)}`);
-    } catch {
-      throw new Error(
-        'Cannot reach the Zoho proxy server. ' +
-        `Start it with: ZOHO_ACCESS_TOKEN=<token> node server.js  (port 3000)`
-      );
-    }
-
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
-      const msg  = body.error || `Proxy error ${res.status}`;
-      if (res.status === 503) throw new Error(`Proxy not configured: ${msg}`);
-      throw new Error(msg);
-    }
-
-    const data = await res.json();
+    const data = await apiGet(`/portal/${enc(PORTAL_NAME)}/tasks/?search_term=${enc(taskId)}`);
     return parseTask(data, taskId);
   }
 
-  /* ── Fetch comments via proxy ────────────────────────────── */
+  /* ── Fetch comments via direct API ──────────────────────── */
   async function fetchTaskComments(taskId, projectId) {
-    const origin = getProxyOrigin();
-    const pid    = projectId || '';
+    if (!projectId) return [];
     try {
-      const res = await fetch(`${origin}/api/zoho/comments/${encodeURIComponent(taskId)}/${encodeURIComponent(pid)}`);
-      if (!res.ok) return [];
-      const data = await res.json();
+      const data = await apiGet(`/portal/${enc(PORTAL_NAME)}/projects/${enc(projectId)}/tasks/${enc(taskId)}/comments/`);
       return (data.comments || []).map(c => ({
         author:    c.added_by?.display_name || c.added_by || '',
         content:   c.content || '',
@@ -157,28 +203,28 @@ const ZohoProjects = (() => {
     } catch { return []; }
   }
 
-  /* ── Mode label from last server status ─────────────────── */
-  function getMode() {
-    return _serverStatus?.mode || 'unknown';
-  }
+  const enc = encodeURIComponent;
 
   /* ── Human-readable summary ──────────────────────────────── */
   function getSummary(parsed) {
     const parts = [];
     if (parsed.approvalStatus !== 'unknown') parts.push(`Status: ${Utils.titleCase(parsed.approvalStatus)}`);
-    if (parsed.taskName)        parts.push(`Task: ${parsed.taskName}`);
-    if (parsed.projectName)     parts.push(`Project: ${parsed.projectName}`);
-    if (parsed.summaryProvider) parts.push(`Submitted by: ${parsed.summaryProvider}`);
+    if (parsed.taskName)         parts.push(`Task: ${parsed.taskName}`);
+    if (parsed.projectName)      parts.push(`Project: ${parsed.projectName}`);
+    if (parsed.summaryProvider)  parts.push(`Submitted by: ${parsed.summaryProvider}`);
     if (parsed.approvers.length) parts.push(`Approver: ${parsed.approvers[0]}`);
-    if (parsed.empIds.length)   parts.push(`${parsed.empIds.length} emp ID(s) found`);
+    if (parsed.empIds.length)    parts.push(`${parsed.empIds.length} emp ID(s) found`);
     return parts.join(' · ') || 'Task fetched — no structured data detected';
   }
 
   return {
-    checkServer,
-    resetCache,
-    getMode,
-    getProxyOrigin,
+    handleOAuthCallback,
+    connect,
+    disconnect,
+    isConnected,
+    getClientId,
+    setClientId,
+    clearClientId,
     fetchTask,
     fetchTaskComments,
     getSummary,
