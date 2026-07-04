@@ -186,40 +186,37 @@ const ZohoProjects = (() => {
 
   /* ── Resolve display ID (e.g. "S07-T1") → numeric task ──── */
   async function resolveDisplayId(displayId) {
-    // Parse prefix and task sequence: "S07-T1" → prefix="S07", seq=1
-    const m = displayId.match(/^([A-Za-z0-9]+)-[Tt](\d+)$/);
-    if (!m) return null;
-    const prefix = m[1].toUpperCase();
-    const seq    = parseInt(m[2], 10);
+    const upper = displayId.toUpperCase();
 
-    // Fetch all projects and find the one matching this prefix
-    const projData = await apiGet(`/portal/${enc(PORTAL_NAME)}/projects/`);
-    const projects = projData.projects || [];
-    const project  = projects.find(p => {
-      const candidates = [p.key, p.prefix, p.id_string, p.name].filter(Boolean);
-      return candidates.some(v => v.toString().toUpperCase() === prefix);
-    });
-    if (!project) {
-      const available = projects.map(p => p.prefix || p.key || p.name || p.id_string).filter(Boolean).join(', ');
-      throw new Error(`No project found with prefix "${prefix}". Available: ${available || 'none'}`);
+    // Try portal-wide task list first — tasks include task_key like "S07-T1"
+    const portalData  = await apiGet(`/portal/${enc(PORTAL_NAME)}/tasks/?range=200`);
+    const portalTasks = portalData.tasks || [];
+    const portalMatch = portalTasks.find(t =>
+      (t.key || t.task_key || '').toUpperCase() === upper
+    );
+    if (portalMatch) {
+      const projectId = portalMatch.project?.id_string || portalMatch.project?.id || '';
+      return { task: portalMatch, projectId };
     }
 
-    const projectId = project.id_string || project.id;
+    // Fallback: iterate each project and search its task list
+    const projData = await apiGet(`/portal/${enc(PORTAL_NAME)}/projects/`);
+    const projects  = projData.projects || [];
+    for (const project of projects) {
+      const projectId = project.id_string || project.id;
+      const taskData  = await apiGet(
+        `/portal/${enc(PORTAL_NAME)}/projects/${enc(projectId)}/tasks/?range=200`
+      );
+      const task = (taskData.tasks || []).find(t =>
+        (t.key || t.task_key || '').toUpperCase() === upper
+      );
+      if (task) {
+        if (!task.project) task.project = { id_string: projectId, name: project.name };
+        return { task, projectId };
+      }
+    }
 
-    // Fetch tasks for this project and find by task_key or sequence
-    const taskData = await apiGet(
-      `/portal/${enc(PORTAL_NAME)}/projects/${enc(projectId)}/tasks/?range=100`
-    );
-    const tasks = taskData.tasks || [];
-
-    const task = tasks.find(t =>
-      (t.key || '').toUpperCase()      === `${prefix}-T${seq}` ||
-      (t.task_key || '').toUpperCase() === `${prefix}-T${seq}` ||
-      parseInt(t.sequence_num || t.task_index || 0, 10) === seq
-    );
-    if (!task) throw new Error(`Task ${displayId} not found in project "${project.name}".`);
-
-    return { task, projectId };
+    throw new Error(`Task "${displayId}" not found in any project on this portal.`);
   }
 
   /* ── Fetch task via direct API ───────────────────────────── */
