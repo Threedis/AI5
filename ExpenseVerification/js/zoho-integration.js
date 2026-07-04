@@ -185,12 +185,23 @@ const ZohoProjects = (() => {
     };
   }
 
-  /* ── Fetch tasks for a project (single page, Zoho limit ~100) */
-  async function fetchAllTasks(projectId, action) {
-    const data = await apiGet(
-      `/portal/${enc(PORTAL_NAME)}/projects/${enc(projectId)}/tasks/?action=${action}`
+  /* ── Fetch all tasks for a project via task lists ────────── */
+  async function fetchAllTasks(projectId) {
+    const listData = await apiGet(
+      `/portal/${enc(PORTAL_NAME)}/projects/${enc(projectId)}/tasklists/`
     );
-    return data.tasks || [];
+    const tasklists = listData.tasklists || [];
+    const all = [];
+    for (const tl of tasklists) {
+      const tlId = tl.id_string || tl.id;
+      try {
+        const taskData = await apiGet(
+          `/portal/${enc(PORTAL_NAME)}/projects/${enc(projectId)}/tasklists/${enc(tlId)}/tasks/`
+        );
+        all.push(...(taskData.tasks || []));
+      } catch { /* skip this tasklist */ }
+    }
+    return all;
   }
 
   /* ── Match a task list against a display ID ─────────────── */
@@ -223,31 +234,21 @@ const ZohoProjects = (() => {
       const projectId  = project.id_string || project.id;
       const projPrefix = (project.prefix || project.key || project.name || '').toUpperCase();
 
-      let openTasks = [];
+      let tasks = [];
       try {
-        openTasks = await fetchAllTasks(projectId, 'allopentasks');
-        if (openTasks.length) {
-          console.debug(`[Zoho] Project "${project.name}" (prefix="${projPrefix}"): ${openTasks.length} open tasks. ALL keys:`,
-            openTasks.map(t => t.key || t.task_key || (t.sequence_num ? `seq:${t.sequence_num}` : '?'))
+        tasks = await fetchAllTasks(projectId);
+        if (tasks.length) {
+          console.debug(`[Zoho] Project "${project.name}" (prefix="${projPrefix}"): ${tasks.length} tasks. ALL keys:`,
+            tasks.map(t => t.key || t.task_key || (t.sequence_num ? `seq:${t.sequence_num}` : '?'))
           );
         }
       } catch { continue; }
 
-      const openMatch = matchTask(openTasks, upper, projPrefix);
-      if (openMatch) {
-        if (!openMatch.project) openMatch.project = { id_string: projectId, name: project.name };
-        return { task: openMatch, projectId };
+      const match = matchTask(tasks, upper, projPrefix);
+      if (match) {
+        if (!match.project) match.project = { id_string: projectId, name: project.name };
+        return { task: match, projectId };
       }
-
-      // Always check closed tasks (task may be closed even when open tasks exist)
-      try {
-        const closedTasks = await fetchAllTasks(projectId, 'closedtasks');
-        const closedMatch = matchTask(closedTasks, upper, projPrefix);
-        if (closedMatch) {
-          if (!closedMatch.project) closedMatch.project = { id_string: projectId, name: project.name };
-          return { task: closedMatch, projectId };
-        }
-      } catch { /* ignore */ }
     }
 
     throw new Error(`Task "${displayId}" not found. Checked ${projects.length} project(s).`);
