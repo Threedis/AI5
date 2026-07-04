@@ -52,7 +52,7 @@ const path  = require('path');
 const fs    = require('fs');
 
 const PORT         = process.env.PORT              || 3000;
-const MCP_CMD      = process.env.ZOHO_MCP_CMD      || 'https://projects-task-management-929471030.zohomcp.com/mcp/77c5b2e70bf15a3888bbe3e3eeb353ef/message';
+const MCP_CMD      = process.env.ZOHO_MCP_CMD      || '';
 const MCP_ARGS     = (process.env.ZOHO_MCP_ARGS    || '').split(',').filter(Boolean);
 const PORTAL_NAME  = process.env.ZOHO_PORTAL_NAME  || 'hbegroupprojects';
 const PROJECT_ID   = process.env.ZOHO_PROJECT_ID   || '';
