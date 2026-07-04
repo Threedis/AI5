@@ -205,6 +205,12 @@
 
               <!-- ── Zoho Task ID panel ── -->
               <div id="zoho-panel">
+                <!-- Proxy server status indicator -->
+                <div id="zoho-proxy-status" style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:var(--radius-sm);font-size:.78rem;margin-bottom:12px;background:var(--bg);border:1px solid var(--border)">
+                  <span id="zoho-proxy-dot" style="width:8px;height:8px;border-radius:50%;background:var(--text-muted);flex-shrink:0"></span>
+                  <span id="zoho-proxy-label" style="color:var(--text-muted)">Checking proxy…</span>
+                </div>
+
                 <div style="display:flex;gap:8px;margin-bottom:12px">
                   <input type="text" id="zoho-task-id" class="form-control" placeholder="Enter Zoho Task ID…" style="flex:1;font-family:var(--font-mono)">
                   <button class="btn btn-primary" id="btn-zoho-search">
@@ -212,38 +218,6 @@
                   </button>
                 </div>
                 <div id="zoho-search-status" style="display:none;font-size:.8rem;color:var(--text-muted);margin-bottom:10px;padding:6px 10px;background:var(--bg);border-radius:var(--radius-sm);border:1px solid var(--border)"></div>
-
-                <!-- Collapsible Zoho settings -->
-                <div style="border:1px solid var(--border);border-radius:var(--radius-sm)">
-                  <button id="btn-zoho-settings-toggle" style="width:100%;background:none;border:none;padding:10px 14px;text-align:left;cursor:pointer;display:flex;align-items:center;gap:8px;font-size:.82rem;color:var(--text-secondary)">
-                    <i class="fa-solid fa-gear"></i> Zoho API Settings
-                    <i class="fa-solid fa-chevron-down" id="zoho-settings-chevron" style="margin-left:auto;font-size:.72rem;transition:transform .2s"></i>
-                  </button>
-                  <div id="zoho-settings-panel" style="display:none;padding:14px;border-top:1px solid var(--border)">
-                    <div style="display:flex;flex-direction:column;gap:10px">
-                      <div>
-                        <label style="font-size:.78rem;font-weight:600;color:var(--text-muted);display:block;margin-bottom:4px">Portal ID <span style="color:var(--accent-red)">*</span></label>
-                        <input type="text" id="zoho-portal-id" class="form-control" placeholder="e.g. threedis or portal_id number">
-                      </div>
-                      <div>
-                        <label style="font-size:.78rem;font-weight:600;color:var(--text-muted);display:block;margin-bottom:4px">Project ID <span style="font-weight:400;color:var(--text-muted)">(optional)</span></label>
-                        <input type="text" id="zoho-project-id" class="form-control" placeholder="e.g. 123456789 — leave blank to search all projects">
-                      </div>
-                      <div>
-                        <label style="font-size:.78rem;font-weight:600;color:var(--text-muted);display:block;margin-bottom:4px">Access Token <span style="color:var(--accent-red)">*</span></label>
-                        <input type="password" id="zoho-access-token" class="form-control" placeholder="Zoho OAuth access token">
-                      </div>
-                      <div style="display:flex;gap:8px">
-                        <button class="btn btn-outline btn-sm" id="btn-zoho-save-config" style="flex:1">
-                          <i class="fa-solid fa-floppy-disk"></i> Save Settings
-                        </button>
-                        <button class="btn btn-ghost btn-sm" id="btn-zoho-clear-config">
-                          <i class="fa-solid fa-trash"></i>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
               </div>
 
               <!-- ── PDF panel ── -->
@@ -581,59 +555,39 @@
   btnModeZoho.addEventListener('click', () => setApprovalMode('zoho'));
   btnModePdf.addEventListener('click',  () => setApprovalMode('pdf'));
 
-  /* ── Zoho Settings toggle ───────────────────────────────── */
-  const zohoSettingsPanel   = document.getElementById('zoho-settings-panel');
-  const zohoSettingsChevron = document.getElementById('zoho-settings-chevron');
-
-  document.getElementById('btn-zoho-settings-toggle').addEventListener('click', () => {
-    const open = zohoSettingsPanel.style.display === 'none';
-    zohoSettingsPanel.style.display    = open ? '' : 'none';
-    zohoSettingsChevron.style.transform = open ? 'rotate(180deg)' : '';
-  });
-
-  // Pre-fill settings from saved config
-  (function loadZohoConfig() {
-    const cfg = ZohoProjects.getConfig();
-    if (cfg.portalId)     document.getElementById('zoho-portal-id').value    = cfg.portalId;
-    if (cfg.projectId)    document.getElementById('zoho-project-id').value   = cfg.projectId;
-    if (cfg.accessToken)  document.getElementById('zoho-access-token').value = cfg.accessToken;
-  })();
-
-  document.getElementById('btn-zoho-save-config').addEventListener('click', () => {
-    const portalId    = document.getElementById('zoho-portal-id').value.trim();
-    const projectId   = document.getElementById('zoho-project-id').value.trim();
-    const accessToken = document.getElementById('zoho-access-token').value.trim();
-    if (!portalId || !accessToken) {
-      App.Toast.warning('Missing Fields', 'Portal ID and Access Token are required.');
-      return;
+  /* ── Zoho proxy status indicator ───────────────────────── */
+  (async function initZohoProxyStatus() {
+    const dot   = document.getElementById('zoho-proxy-dot');
+    const label = document.getElementById('zoho-proxy-label');
+    const btn   = document.getElementById('btn-zoho-search');
+    try {
+      const status = await ZohoProjects.checkServer();
+      if (status.offline) {
+        dot.style.background = 'var(--accent-red)';
+        label.style.color    = 'var(--accent-red)';
+        label.textContent    = 'Zoho proxy offline — start server.js to enable task search';
+        btn.disabled = true;
+      } else if (!status.configured) {
+        dot.style.background = 'var(--accent-orange)';
+        label.style.color    = 'var(--accent-orange)';
+        label.textContent    = 'Proxy running — ZOHO_ACCESS_TOKEN not set';
+        btn.disabled = true;
+      } else {
+        dot.style.background = 'var(--accent-green)';
+        label.style.color    = 'var(--accent-green)';
+        label.textContent    = `Connected · Portal: ${status.portalId}`;
+      }
+    } catch {
+      dot.style.background = 'var(--accent-red)';
+      label.textContent    = 'Could not reach proxy server';
+      btn.disabled = true;
     }
-    ZohoProjects.saveConfig({ portalId, projectId: projectId || '', accessToken });
-    App.Toast.success('Saved', 'Zoho API settings saved.');
-    zohoSettingsPanel.style.display    = 'none';
-    zohoSettingsChevron.style.transform = '';
-  });
-
-  document.getElementById('btn-zoho-clear-config').addEventListener('click', async () => {
-    const ok = await App.Modal.confirm({ title: 'Clear Zoho Settings', message: 'Remove saved Zoho API credentials?', confirmText: 'Clear', confirmClass: 'btn-danger' });
-    if (!ok) return;
-    ZohoProjects.saveConfig({ portalId: '', projectId: '', accessToken: '' });
-    document.getElementById('zoho-portal-id').value    = '';
-    document.getElementById('zoho-project-id').value   = '';
-    document.getElementById('zoho-access-token').value = '';
-    App.Toast.success('Cleared', 'Zoho settings removed.');
-  });
+  })();
 
   /* ── Zoho Task Search ───────────────────────────────────── */
   async function doZohoSearch() {
     const taskId = document.getElementById('zoho-task-id').value.trim();
     if (!taskId) { App.Toast.warning('Task ID', 'Enter a Zoho Task ID.'); return; }
-
-    if (!ZohoProjects.isConfigured()) {
-      App.Toast.warning('Not Configured', 'Open Zoho API Settings and save your Portal ID and Access Token.');
-      document.getElementById('zoho-settings-panel').style.display = '';
-      zohoSettingsChevron.style.transform = 'rotate(180deg)';
-      return;
-    }
 
     const statusEl = document.getElementById('zoho-search-status');
     statusEl.style.display  = '';

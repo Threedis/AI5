@@ -1,33 +1,47 @@
 /**
- * zoho-integration.js — Zoho Projects REST API client
- * Fetches task details by Task ID, extracts approval info and summary provider.
- * Config (portal ID, project ID, access token) stored in localStorage.
+ * zoho-integration.js — Zoho Projects client via local MCP proxy.
+ *
+ * All Zoho API calls go through the local Node.js proxy server (server.js),
+ * which holds the OAuth access token in an environment variable.
+ * The browser never handles Zoho credentials directly.
+ *
+ * Proxy endpoints (served by ExpenseVerification/server.js):
+ *   GET /api/zoho/status              → { configured, portalId, hasProject }
+ *   GET /api/zoho/task/:taskId        → raw Zoho task JSON
+ *   GET /api/zoho/comments/:taskId/:projectId  → raw Zoho comments JSON
  */
 
 const ZohoProjects = (() => {
 
-  const CONFIG_KEY = 'evs_zoho_config';
-
-  /* ── Config helpers ──────────────────────────────────────── */
-  function getConfig() {
-    try { return JSON.parse(localStorage.getItem(CONFIG_KEY) || '{}'); }
-    catch { return {}; }
+  /* Proxy origin — same host when running via server.js, or override via
+     localStorage key 'evs_zoho_proxy' for a remote deployment.           */
+  function getProxyOrigin() {
+    try { return localStorage.getItem('evs_zoho_proxy') || 'http://localhost:3000'; }
+    catch { return 'http://localhost:3000'; }
   }
 
-  function saveConfig(cfg) {
-    localStorage.setItem(CONFIG_KEY, JSON.stringify({ ...getConfig(), ...cfg }));
+  let _serverStatus = null; // cached { configured, portalId, hasProject } | null
+
+  /* ── Server connectivity check ──────────────────────────── */
+  async function checkServer() {
+    if (_serverStatus) return _serverStatus;
+    try {
+      const res = await fetch(`${getProxyOrigin()}/api/zoho/status`, { signal: AbortSignal.timeout(3000) });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      _serverStatus = await res.json();
+    } catch {
+      _serverStatus = { configured: false, portalId: null, hasProject: false, offline: true };
+    }
+    return _serverStatus;
   }
 
-  function isConfigured() {
-    const c = getConfig();
-    return !!(c.accessToken && c.portalId);
-  }
+  function resetCache() { _serverStatus = null; }
 
   /* ── Approval status derivation ──────────────────────────── */
   function deriveApprovalStatus(task) {
     const s = (task.status?.name || task.status || '').toLowerCase();
-    if (/complet|done|approv|clear|paid/i.test(s))  return 'approved';
-    if (/reject|denied|cancel|revert/i.test(s))     return 'rejected';
+    if (/complet|done|approv|clear|paid/i.test(s))   return 'approved';
+    if (/reject|denied|cancel|revert/i.test(s))      return 'rejected';
     if (/pending|progress|review|open|new/i.test(s)) return 'pending';
     return 'unknown';
   }
@@ -72,13 +86,10 @@ const ZohoProjects = (() => {
     const task = Array.isArray(raw.tasks) ? raw.tasks[0] : (raw.task || raw);
     if (!task || (!task.id && !task.id_string)) throw new Error(`Task ${taskId} not found in Zoho Projects.`);
 
-    const empIds = extractEmpIds(task);
-    const approvers = extractApprovers(task);
-
-    // "Summary provider" = person who created/submitted the task
+    const empIds     = extractEmpIds(task);
+    const approvers  = extractApprovers(task);
     const summaryProvider = task.created_by?.display_name || task.created_by || '';
 
-    // Custom fields as key-value map for display
     const customMap = {};
     (task.custom_fields || []).forEach(cf => {
       const label = cf.column_name || cf.label_name || cf.field_id || '';
@@ -86,72 +97,56 @@ const ZohoProjects = (() => {
     });
 
     return {
-      taskId:          task.id_string || task.id || taskId,
-      taskName:        task.name || '',
-      projectName:     task.project?.name || '',
-      status:          task.status?.name || task.status || '',
-      approvalStatus:  deriveApprovalStatus(task),
-      createdBy:       summaryProvider,
+      taskId:         task.id_string || task.id || taskId,
+      taskName:       task.name || '',
+      projectName:    task.project?.name || '',
+      projectId:      task.project?.id_string || task.project?.id || '',
+      status:         task.status?.name || task.status || '',
+      approvalStatus: deriveApprovalStatus(task),
+      createdBy:      summaryProvider,
       summaryProvider,
       approvers,
       empIds,
-      assignees:       (task.details?.owners || []).map(o => o.display_name || '').filter(Boolean),
-      description:     task.description || '',
-      createdAt:       task.created_time_string || task.created_time || '',
-      dueDate:         task.end_date_string || task.end_date || '',
-      isCompleted:     !!task.completed,
-      customFields:    customMap,
-      _raw:            task,
+      assignees:      (task.details?.owners || []).map(o => o.display_name || '').filter(Boolean),
+      description:    task.description || '',
+      createdAt:      task.created_time_string || task.created_time || '',
+      dueDate:        task.end_date_string || task.end_date || '',
+      isCompleted:    !!task.completed,
+      customFields:   customMap,
+      _raw:           task,
     };
   }
 
-  /* ── Call Zoho Projects REST API ─────────────────────────── */
+  /* ── Fetch task via proxy ────────────────────────────────── */
   async function fetchTask(taskId) {
-    const cfg = getConfig();
-    if (!cfg.accessToken) throw new Error('Zoho access token not set. Open ⚙ Zoho Settings below.');
-    if (!cfg.portalId)    throw new Error('Zoho portal ID not set. Open ⚙ Zoho Settings below.');
-
-    const headers = {
-      'Authorization': `Zoho-oauthtoken ${cfg.accessToken}`,
-    };
-
-    // If projectId is known, hit the direct endpoint; otherwise search across the portal.
-    let url;
-    if (cfg.projectId) {
-      url = `https://projectsapi.zoho.com/restapi/portal/${encodeURIComponent(cfg.portalId)}/projects/${encodeURIComponent(cfg.projectId)}/tasks/${encodeURIComponent(taskId)}/`;
-    } else {
-      // Search by task ID string across portal
-      url = `https://projectsapi.zoho.com/restapi/portal/${encodeURIComponent(cfg.portalId)}/tasks/?search_term=${encodeURIComponent(taskId)}`;
-    }
-
+    const origin = getProxyOrigin();
     let res;
     try {
-      res = await fetch(url, { headers });
-    } catch (netErr) {
-      throw new Error(`Network error reaching Zoho API: ${netErr.message}`);
+      res = await fetch(`${origin}/api/zoho/task/${encodeURIComponent(taskId)}`);
+    } catch {
+      throw new Error(
+        'Cannot reach the Zoho proxy server. ' +
+        `Start it with: ZOHO_ACCESS_TOKEN=<token> node server.js  (port 3000)`
+      );
     }
 
-    if (res.status === 401) throw new Error('Zoho access token is invalid or expired.');
-    if (res.status === 403) throw new Error('Zoho access denied — check token scopes (ZohoProjects.tasks.READ).');
     if (!res.ok) {
-      const txt = await res.text().catch(() => '');
-      throw new Error(`Zoho API error ${res.status}: ${txt.slice(0, 200)}`);
+      const body = await res.json().catch(() => ({}));
+      const msg  = body.error || `Proxy error ${res.status}`;
+      if (res.status === 503) throw new Error(`Proxy not configured: ${msg}`);
+      throw new Error(msg);
     }
 
     const data = await res.json();
     return parseTask(data, taskId);
   }
 
-  /* ── Fetch comments for a task (to find summary submitter) ─ */
+  /* ── Fetch comments via proxy ────────────────────────────── */
   async function fetchTaskComments(taskId, projectId) {
-    const cfg = getConfig();
-    if (!cfg.accessToken || !cfg.portalId) return [];
-    const pid = projectId || cfg.projectId;
-    if (!pid) return [];
-
-    const url = `https://projectsapi.zoho.com/restapi/portal/${encodeURIComponent(cfg.portalId)}/projects/${encodeURIComponent(pid)}/tasks/${encodeURIComponent(taskId)}/comments/`;
+    const origin = getProxyOrigin();
+    const pid    = projectId || '';
     try {
-      const res = await fetch(url, { headers: { 'Authorization': `Zoho-oauthtoken ${cfg.accessToken}` } });
+      const res = await fetch(`${origin}/api/zoho/comments/${encodeURIComponent(taskId)}/${encodeURIComponent(pid)}`);
       if (!res.ok) return [];
       const data = await res.json();
       return (data.comments || []).map(c => ({
@@ -162,22 +157,22 @@ const ZohoProjects = (() => {
     } catch { return []; }
   }
 
-  /* ── Build a human-readable summary string ───────────────── */
+  /* ── Human-readable summary ──────────────────────────────── */
   function getSummary(parsed) {
     const parts = [];
     if (parsed.approvalStatus !== 'unknown') parts.push(`Status: ${Utils.titleCase(parsed.approvalStatus)}`);
-    if (parsed.taskName)       parts.push(`Task: ${parsed.taskName}`);
-    if (parsed.projectName)    parts.push(`Project: ${parsed.projectName}`);
+    if (parsed.taskName)        parts.push(`Task: ${parsed.taskName}`);
+    if (parsed.projectName)     parts.push(`Project: ${parsed.projectName}`);
     if (parsed.summaryProvider) parts.push(`Submitted by: ${parsed.summaryProvider}`);
     if (parsed.approvers.length) parts.push(`Approver: ${parsed.approvers[0]}`);
-    if (parsed.empIds.length)  parts.push(`${parsed.empIds.length} emp ID(s) found`);
+    if (parsed.empIds.length)   parts.push(`${parsed.empIds.length} emp ID(s) found`);
     return parts.join(' · ') || 'Task fetched — no structured data detected';
   }
 
   return {
-    getConfig,
-    saveConfig,
-    isConfigured,
+    checkServer,
+    resetCache,
+    getProxyOrigin,
     fetchTask,
     fetchTaskComments,
     getSummary,
