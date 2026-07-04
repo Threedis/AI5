@@ -185,43 +185,66 @@ const ZohoProjects = (() => {
     };
   }
 
+  /* ── Match a task list against a display ID ─────────────── */
+  function matchTask(tasks, upper, projPrefix) {
+    return tasks.find(t => {
+      const key     = (t.key      || '').toUpperCase();
+      const taskKey = (t.task_key || '').toUpperCase();
+      if (key === upper || taskKey === upper) return true;
+
+      // Zoho sometimes omits the "T": e.g. "S07-1" instead of "S07-T1"
+      const seq = String(t.sequence_num || t.task_index || '');
+      if (seq) {
+        if (projPrefix && `${projPrefix}-T${seq}` === upper) return true;
+        if (projPrefix && `${projPrefix}-${seq}`  === upper) return true;
+      }
+      return false;
+    });
+  }
+
   /* ── Resolve display ID (e.g. "S07-T1") → numeric task ──── */
   async function resolveDisplayId(displayId) {
     const upper = displayId.toUpperCase();
 
-    // Get all projects then search each one's task list
     const projData = await apiGet(`/portal/${enc(PORTAL_NAME)}/projects/`);
     const projects  = projData.projects || [];
 
+    console.debug(`[Zoho] Searching ${projects.length} projects for task "${displayId}"`);
+
     for (const project of projects) {
       const projectId  = project.id_string || project.id;
-      const projPrefix = (project.prefix || project.key || '').toUpperCase();
-      let tasks = [];
+      const projPrefix = (project.prefix || project.key || project.name || '').toUpperCase();
+
+      let openTasks = [];
       try {
         const taskData = await apiGet(
           `/portal/${enc(PORTAL_NAME)}/projects/${enc(projectId)}/tasks/?action=allopentasks`
         );
-        tasks = taskData.tasks || [];
-        // If open tasks didn't include it, also check closed
-        if (!tasks.length) {
-          const closed = await apiGet(
-            `/portal/${enc(PORTAL_NAME)}/projects/${enc(projectId)}/tasks/?action=closedtasks`
+        openTasks = taskData.tasks || [];
+        if (openTasks.length) {
+          console.debug(`[Zoho] Project "${project.name}" (prefix="${projPrefix}"): ${openTasks.length} open tasks. First task keys:`,
+            openTasks.slice(0, 3).map(t => ({ key: t.key, task_key: t.task_key, seq: t.sequence_num || t.task_index }))
           );
-          tasks = closed.tasks || [];
         }
       } catch { continue; }
 
-      const task = tasks.find(t => {
-        if ((t.key       || '').toUpperCase() === upper) return true;
-        if ((t.task_key  || '').toUpperCase() === upper) return true;
-        const seq = t.sequence_num || t.task_index || '';
-        if (projPrefix && seq && `${projPrefix}-T${seq}` === upper) return true;
-        return false;
-      });
-      if (task) {
-        if (!task.project) task.project = { id_string: projectId, name: project.name };
-        return { task, projectId };
+      const openMatch = matchTask(openTasks, upper, projPrefix);
+      if (openMatch) {
+        if (!openMatch.project) openMatch.project = { id_string: projectId, name: project.name };
+        return { task: openMatch, projectId };
       }
+
+      // Always check closed tasks (task may be closed even when open tasks exist)
+      try {
+        const closedData = await apiGet(
+          `/portal/${enc(PORTAL_NAME)}/projects/${enc(projectId)}/tasks/?action=closedtasks`
+        );
+        const closedMatch = matchTask(closedData.tasks || [], upper, projPrefix);
+        if (closedMatch) {
+          if (!closedMatch.project) closedMatch.project = { id_string: projectId, name: project.name };
+          return { task: closedMatch, projectId };
+        }
+      } catch { /* ignore */ }
     }
 
     throw new Error(`Task "${displayId}" not found. Checked ${projects.length} project(s).`);
