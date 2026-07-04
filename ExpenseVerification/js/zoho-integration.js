@@ -29,10 +29,12 @@ const ZohoProjects = (() => {
   const TOKEN_KEY     = 'zoho_token';
   const CLIENT_ID_KEY = 'zoho_client_id';
 
+  /* ── Client ID (stored by user in localStorage) ─────────── */
   function getClientId()   { return localStorage.getItem(CLIENT_ID_KEY) || ''; }
   function setClientId(id) { localStorage.setItem(CLIENT_ID_KEY, id.trim()); }
   function clearClientId() { localStorage.removeItem(CLIENT_ID_KEY); }
 
+  /* ── Token management ────────────────────────────────────── */
   function getToken() {
     try {
       const raw = sessionStorage.getItem(TOKEN_KEY);
@@ -53,6 +55,7 @@ const ZohoProjects = (() => {
   function clearToken() { sessionStorage.removeItem(TOKEN_KEY); }
   function isConnected() { return !!getToken(); }
 
+  /* ── OAuth callback — call on page load ──────────────────── */
   function handleOAuthCallback() {
     if (!location.hash) return false;
     const params = new URLSearchParams(location.hash.replace(/^#/, ''));
@@ -64,6 +67,7 @@ const ZohoProjects = (() => {
     return true;
   }
 
+  /* ── Initiate OAuth redirect ─────────────────────────────── */
   function connect() {
     const clientId = getClientId();
     if (!clientId) throw new Error('Enter your Zoho Client ID first.');
@@ -81,6 +85,7 @@ const ZohoProjects = (() => {
 
   function disconnect() { clearToken(); }
 
+  /* ── Zoho Projects REST API call ─────────────────────────── */
   async function apiGet(path) {
     const token = getToken();
     if (!token) throw new Error('Not connected. Click "Connect to Zoho" to authenticate.');
@@ -98,6 +103,7 @@ const ZohoProjects = (() => {
     return res.json();
   }
 
+  /* ── Approval status derivation ──────────────────────────── */
   function deriveApprovalStatus(task) {
     const s = (task.status?.name || task.status || '').toLowerCase();
     if (/complet|done|approv|clear|paid/i.test(s))   return 'approved';
@@ -106,6 +112,7 @@ const ZohoProjects = (() => {
     return 'unknown';
   }
 
+  /* ── Extract approvers from task object ──────────────────── */
   function extractApprovers(task) {
     const names = new Set();
     (task.details?.owners || []).forEach(o => { if (o.display_name) names.add(o.display_name); });
@@ -118,6 +125,7 @@ const ZohoProjects = (() => {
     return [...names];
   }
 
+  /* ── Extract employee IDs from task text ─────────────────── */
   function extractEmpIds(task) {
     const text = [
       task.name || '',
@@ -138,6 +146,7 @@ const ZohoProjects = (() => {
     return [...ids];
   }
 
+  /* ── Parse a raw Zoho task object into our approval shape ── */
   function parseTask(raw, taskId) {
     const task = Array.isArray(raw.tasks) ? raw.tasks[0] : (raw.task || raw);
     if (!task || (!task.id && !task.id_string)) throw new Error(`Task ${taskId} not found in Zoho Projects.`);
@@ -173,44 +182,46 @@ const ZohoProjects = (() => {
     };
   }
 
+  /* ── Resolve display ID (e.g. "S07-T1") → numeric task ──── */
   async function resolveDisplayId(displayId) {
-    const m = displayId.match(/^([A-Za-z0-9]+)-[Tt](\d+)$/);
-    if (!m) return null;
-    const prefix = m[1].toUpperCase();
-    const seq    = parseInt(m[2], 10);
+    const upper = displayId.toUpperCase();
 
-    const projData = await apiGet(`/portal/${enc(PORTAL_NAME)}/projects/`);
-    const projects = projData.projects || [];
-
-    const project = projects.find(p => {
-      const candidates = [p.key, p.prefix, p.id_string, p.name].filter(Boolean);
-      return candidates.some(v => v.toString().toUpperCase() === prefix);
-    });
-    if (!project) {
-      const available = projects.map(p => p.prefix || p.key || p.name || p.id_string).filter(Boolean).join(', ');
-      throw new Error(`No project found with prefix "${prefix}". Available: ${available || 'none'}`);
+    // Try portal-wide task list first — tasks include task_key like "S07-T1"
+    const portalData  = await apiGet(`/portal/${enc(PORTAL_NAME)}/tasks/?range=200`);
+    const portalTasks = portalData.tasks || [];
+    const portalMatch = portalTasks.find(t =>
+      (t.key || t.task_key || '').toUpperCase() === upper
+    );
+    if (portalMatch) {
+      const projectId = portalMatch.project?.id_string || portalMatch.project?.id || '';
+      return { task: portalMatch, projectId };
     }
 
-    const projectId = project.id_string || project.id;
+    // Fallback: iterate each project and search its task list
+    const projData = await apiGet(`/portal/${enc(PORTAL_NAME)}/projects/`);
+    const projects  = projData.projects || [];
+    for (const project of projects) {
+      const projectId = project.id_string || project.id;
+      const taskData  = await apiGet(
+        `/portal/${enc(PORTAL_NAME)}/projects/${enc(projectId)}/tasks/?range=200`
+      );
+      const task = (taskData.tasks || []).find(t =>
+        (t.key || t.task_key || '').toUpperCase() === upper
+      );
+      if (task) {
+        if (!task.project) task.project = { id_string: projectId, name: project.name };
+        return { task, projectId };
+      }
+    }
 
-    const taskData = await apiGet(
-      `/portal/${enc(PORTAL_NAME)}/projects/${enc(projectId)}/tasks/?range=100`
-    );
-    const tasks = taskData.tasks || [];
-
-    const task = tasks.find(t =>
-      (t.key || '').toUpperCase()      === `${prefix}-T${seq}` ||
-      (t.task_key || '').toUpperCase() === `${prefix}-T${seq}` ||
-      parseInt(t.sequence_num || t.task_index || 0, 10) === seq
-    );
-    if (!task) throw new Error(`Task ${displayId} not found in project "${project.name}".`);
-
-    return { task, projectId };
+    throw new Error(`Task "${displayId}" not found in any project on this portal.`);
   }
 
+  /* ── Fetch task via direct API ───────────────────────────── */
   async function fetchTask(taskId) {
     const input = taskId.trim();
 
+    // Display ID path: e.g. "S07-T1"
     if (/^[A-Za-z0-9]+-[Tt]\d+$/.test(input)) {
       const resolved = await resolveDisplayId(input);
       if (resolved) {
@@ -220,10 +231,12 @@ const ZohoProjects = (() => {
       }
     }
 
+    // Fallback: search by term (works for numeric IDs or task names)
     const data = await apiGet(`/portal/${enc(PORTAL_NAME)}/tasks/?search_term=${enc(input)}`);
     return parseTask(data, input);
   }
 
+  /* ── Fetch comments via direct API ──────────────────────── */
   async function fetchTaskComments(taskId, projectId) {
     if (!projectId) return [];
     try {
@@ -238,6 +251,7 @@ const ZohoProjects = (() => {
 
   const enc = encodeURIComponent;
 
+  /* ── Human-readable summary ──────────────────────────────── */
   function getSummary(parsed) {
     const parts = [];
     if (parsed.approvalStatus !== 'unknown') parts.push(`Status: ${Utils.titleCase(parsed.approvalStatus)}`);
