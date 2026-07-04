@@ -195,10 +195,14 @@ const ZohoProjects = (() => {
     // Fetch all projects and find the one matching this prefix
     const projData = await apiGet(`/portal/${enc(PORTAL_NAME)}/projects/`);
     const projects = projData.projects || [];
-    const project  = projects.find(p =>
-      (p.key || p.prefix || p.id_string || '').toString().toUpperCase() === prefix
-    );
-    if (!project) throw new Error(`No project found with prefix "${prefix}". Check the task ID.`);
+    const project  = projects.find(p => {
+      const candidates = [p.key, p.prefix, p.id_string, p.name].filter(Boolean);
+      return candidates.some(v => v.toString().toUpperCase() === prefix);
+    });
+    if (!project) {
+      const available = projects.map(p => p.prefix || p.key || p.name || p.id_string).filter(Boolean).join(', ');
+      throw new Error(`No project found with prefix "${prefix}". Available: ${available || 'none'}`);
+    }
 
     const projectId = project.id_string || project.id;
 
