@@ -100,7 +100,9 @@ const ZohoProjects = (() => {
     const text = await res.text();
     const json = text ? JSON.parse(text) : {};
     if (!res.ok) {
-      throw new Error(json.error?.message || json.message || `Zoho API error ${res.status}`);
+      const msg = json.error?.message || json.message || `Zoho API error ${res.status}`;
+      console.debug(`[Zoho] ${res.status} on ${path}:`, json);
+      throw new Error(msg);
     }
     return json;
   }
@@ -185,6 +187,20 @@ const ZohoProjects = (() => {
     };
   }
 
+  /* ── Fetch tasks from one tasklist (open + closed) ──────── */
+  async function fetchTasklistTasks(projectId, tlId) {
+    const tasks = [];
+    for (const status of ['open', 'closed']) {
+      try {
+        const data = await apiGet(
+          `/portal/${enc(PORTAL_NAME)}/projects/${enc(projectId)}/tasklists/${enc(tlId)}/tasks/?status=${status}`
+        );
+        tasks.push(...(data.tasks || []));
+      } catch { /* skip */ }
+    }
+    return tasks;
+  }
+
   /* ── Fetch all tasks for a project via task lists ────────── */
   async function fetchAllTasks(projectId) {
     const listData = await apiGet(
@@ -194,12 +210,8 @@ const ZohoProjects = (() => {
     const all = [];
     for (const tl of tasklists) {
       const tlId = tl.id_string || tl.id;
-      try {
-        const taskData = await apiGet(
-          `/portal/${enc(PORTAL_NAME)}/projects/${enc(projectId)}/tasklists/${enc(tlId)}/tasks/`
-        );
-        all.push(...(taskData.tasks || []));
-      } catch { /* skip this tasklist */ }
+      const tasks = await fetchTasklistTasks(projectId, tlId);
+      all.push(...tasks);
     }
     return all;
   }
