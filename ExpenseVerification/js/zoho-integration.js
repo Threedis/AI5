@@ -96,11 +96,12 @@ const ZohoProjects = (() => {
       clearToken();
       throw new Error('Zoho session expired. Click "Connect to Zoho" to reconnect.');
     }
+    const text = await res.text();
+    const json = text ? JSON.parse(text) : {};
     if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
-      throw new Error(body.error?.message || body.message || `Zoho API error ${res.status}`);
+      throw new Error(json.error?.message || json.message || `Zoho API error ${res.status}`);
     }
-    return res.json();
+    return json;
   }
 
   /* ── Approval status derivation ──────────────────────────── */
