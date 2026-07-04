@@ -185,20 +185,12 @@ const ZohoProjects = (() => {
     };
   }
 
-  /* ── Fetch all pages of tasks for a project ─────────────── */
+  /* ── Fetch tasks for a project (single page, Zoho limit ~100) */
   async function fetchAllTasks(projectId, action) {
-    const all = [];
-    let index = 1;
-    while (true) {
-      const data = await apiGet(
-        `/portal/${enc(PORTAL_NAME)}/projects/${enc(projectId)}/tasks/?action=${action}&index=${index}&range=100`
-      );
-      const page = data.tasks || [];
-      all.push(...page);
-      if (page.length < 100) break;
-      index += 100;
-    }
-    return all;
+    const data = await apiGet(
+      `/portal/${enc(PORTAL_NAME)}/projects/${enc(projectId)}/tasks/?action=${action}`
+    );
+    return data.tasks || [];
   }
 
   /* ── Match a task list against a display ID ─────────────── */
