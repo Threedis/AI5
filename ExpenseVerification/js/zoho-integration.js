@@ -2,11 +2,11 @@
  * zoho-integration.js — Zoho Projects client via local MCP proxy.
  *
  * All Zoho API calls go through the local Node.js proxy server (server.js),
- * which holds the OAuth access token in an environment variable.
+ * which connects to the Zoho MCP server process and calls its tools.
  * The browser never handles Zoho credentials directly.
  *
  * Proxy endpoints (served by ExpenseVerification/server.js):
- *   GET /api/zoho/status              → { configured, portalId, hasProject }
+ *   GET /api/zoho/status              → { mode, configured, portalName, hasProject }
  *   GET /api/zoho/task/:taskId        → raw Zoho task JSON
  *   GET /api/zoho/comments/:taskId/:projectId  → raw Zoho comments JSON
  */
@@ -20,7 +20,7 @@ const ZohoProjects = (() => {
     catch { return 'http://localhost:3000'; }
   }
 
-  let _serverStatus = null; // cached { configured, portalId, hasProject } | null
+  let _serverStatus = null; // cached { mode, configured, portalName, hasProject } | null
 
   /* ── Server connectivity check ──────────────────────────── */
   async function checkServer() {
@@ -30,12 +30,17 @@ const ZohoProjects = (() => {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       _serverStatus = await res.json();
     } catch {
-      _serverStatus = { configured: false, portalId: null, hasProject: false, offline: true };
+      _serverStatus = { configured: false, portalName: null, hasProject: false, offline: true };
     }
     return _serverStatus;
   }
 
   function resetCache() { _serverStatus = null; }
+
+  /* ── Mode label from last server status ─────────────────── */
+  function getMode() {
+    return _serverStatus?.mode || 'unknown';
+  }
 
   /* ── Approval status derivation ──────────────────────────── */
   function deriveApprovalStatus(task) {
@@ -126,7 +131,7 @@ const ZohoProjects = (() => {
     } catch {
       throw new Error(
         'Cannot reach the Zoho proxy server. ' +
-        `Start it with: ZOHO_ACCESS_TOKEN=<token> node server.js  (port 3000)`
+        'Run: npm install && ZOHO_MCP_CMD=<mcp-cmd> node server.js'
       );
     }
 
@@ -172,6 +177,7 @@ const ZohoProjects = (() => {
   return {
     checkServer,
     resetCache,
+    getMode,
     getProxyOrigin,
     fetchTask,
     fetchTaskComments,

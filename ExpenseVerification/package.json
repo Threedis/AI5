@@ -1,0 +1,13 @@
+{
+  "name": "evs-zoho-proxy",
+  "version": "1.0.0",
+  "description": "Local MCP proxy for Expense Verification — routes Zoho Projects lookups through the Zoho MCP server",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "install-mcp": "npm install @modelcontextprotocol/sdk"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0"
+  }
+}

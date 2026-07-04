@@ -524,7 +524,7 @@
   ══════════════════════════════════════════════════════════ */
   let pdfFile      = null;
   let pdfParsed    = null;
-  let verifyResults = null; // current results array
+  let verifyResults = null;
   let verifyPage   = 1;
   const PAGE_SIZE  = 50;
   let vFiltered    = [];
@@ -533,8 +533,8 @@
   /* ══════════════════════════════════════════════════════════
      APPROVAL SOURCE MODE TOGGLE
   ══════════════════════════════════════════════════════════ */
-  let approvalMode = 'zoho'; // 'zoho' | 'pdf'
-  let zohoTask = null; // parsed Zoho task
+  let approvalMode = 'zoho';
+  let zohoTask = null;
 
   const btnModeZoho = document.getElementById('btn-mode-zoho');
   const btnModePdf  = document.getElementById('btn-mode-pdf');
@@ -565,17 +565,18 @@
       if (status.offline) {
         dot.style.background = 'var(--accent-red)';
         label.style.color    = 'var(--accent-red)';
-        label.textContent    = 'Zoho proxy offline — start server.js to enable task search';
+        label.textContent    = 'Zoho proxy offline — run: npm install && node server.js';
         btn.disabled = true;
       } else if (!status.configured) {
         dot.style.background = 'var(--accent-orange)';
         label.style.color    = 'var(--accent-orange)';
-        label.textContent    = 'Proxy running — ZOHO_ACCESS_TOKEN not set';
+        label.textContent    = 'Proxy running — set ZOHO_MCP_CMD or ZOHO_ACCESS_TOKEN';
         btn.disabled = true;
       } else {
         dot.style.background = 'var(--accent-green)';
         label.style.color    = 'var(--accent-green)';
-        label.textContent    = `Connected · Portal: ${status.portalId}`;
+        const modeLabel = status.mode === 'mcp' ? 'MCP' : 'REST';
+        label.textContent    = `Connected via ${modeLabel} · Portal: ${status.portalName || status.portalId}`;
       }
     } catch {
       dot.style.background = 'var(--accent-red)';
@@ -704,7 +705,6 @@
     const statusIcon  = { approved:'fa-circle-check', rejected:'fa-circle-xmark', pending:'fa-clock', unknown:'fa-circle-question' }[parsed.approvalStatus] || 'fa-circle-question';
     const statusLabel = Utils.titleCase(parsed.approvalStatus);
 
-    // Normalise: Zoho task fields vs PDF fields
     const isZoho     = source === 'zoho';
     const taskRef    = isZoho ? parsed.taskId   : parsed.taskNo;
     const taskLabel  = isZoho ? parsed.taskName : null;
@@ -748,7 +748,7 @@
       </div>`;
   }
 
-  /* ── Emp quick-check table (used by both Zoho and PDF) ──── */
+  /* ── Emp quick-check table ──────────────────────────────── */
   async function renderPdfEmpTable(parsed) {
     const hrAll  = await Database.getAll('hrMaster');
     const accAll = await Database.getAll('accountsMaster');
@@ -811,7 +811,6 @@
         filterEmpIds: meta.filterEmpIds || null,
       });
 
-      // Save session
       await Verification.saveSession(results, summary, {
         createdBy: sess.username,
         source:    meta.source  || 'manual',
@@ -875,7 +874,6 @@
       const hr  = r.hr  || {};
       const acc = r.acc || {};
 
-      // Build diff cells
       const accNoMatch = hr.bankAccountNumber && acc.accountNo &&
         hr.bankAccountNumber.replace(/\D/g,'') === acc.accountNo.replace(/\D/g,'');
       const ifscMatch  = hr.ifsc && acc.ifsc && hr.ifsc.toUpperCase() === acc.ifsc.toUpperCase();
@@ -913,7 +911,6 @@
     renderPagination('verify-pagination', verifyPage, pages, p => { verifyPage = p; renderVerifyTable(); });
   }
 
-  /* ── Verify filters ─────────────────────────────────────── */
   function applyVerifyFilters() {
     if (!verifyResults) return;
     const q   = document.getElementById('verify-filter').value.toLowerCase();
@@ -931,7 +928,6 @@
   document.getElementById('verify-filter').addEventListener('input',        Utils.debounce(applyVerifyFilters, 250));
   document.getElementById('verify-status-filter').addEventListener('change', applyVerifyFilters);
 
-  /* ── Download buttons ───────────────────────────────────── */
   document.getElementById('btn-dl-excel').addEventListener('click', async () => {
     if (!verifyResults) { App.Toast.warning('No Data', 'Run verification first.'); return; }
     try { App.Loader.show('Generating report…'); await Verification.generateDiscrepancyReport(verifyResults); App.Loader.hide(); }
@@ -1008,7 +1004,6 @@
   document.getElementById('search-hr-only').addEventListener('change',  () => renderSearchResults(searchResults));
   document.getElementById('search-acc-only').addEventListener('change', () => renderSearchResults(searchResults));
 
-  /* ── Also wire global header search ────────────────────── */
   document.getElementById('global-search-input').addEventListener('keydown', e => {
     if (e.key === 'Enter' && e.target.value.trim()) {
       document.getElementById('global-emp-search').value = e.target.value.trim();
@@ -1159,17 +1154,13 @@
       <span class="page-info">Page ${cur} of ${total}</span>`;
   }
 
-  /* ── URL param: ?search=... ─────────────────────────────── */
   const urlSearch = new URLSearchParams(window.location.search).get('search');
   if (urlSearch) {
     document.getElementById('global-emp-search').value = urlSearch;
     await doSearch();
   }
 
-  /* ── Initial mode ───────────────────────────────────────── */
   setApprovalMode('zoho');
-
-  /* ── Initial load ───────────────────────────────────────── */
   await loadHistory();
   await Audit.log({ module: 'Verification', action: 'PageView', status: 'success' });
 
