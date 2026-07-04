@@ -762,14 +762,92 @@
     const pageCount  = isZoho ? null : parsed.pageCount;
     const taskStatus = isZoho ? parsed.status : null;
 
+    // Evidence source badges
+    const evidenceSources = parsed.evidenceSources || [];
+    const srcBadge = s => {
+      const map = {
+        'task-status': ['fa-flag','Task Status'],
+        'comments':    ['fa-comment','Comments'],
+        'attachments': ['fa-paperclip','Attachments'],
+      };
+      const [icon, label] = map[s] || ['fa-circle','?'];
+      return `<span style="font-size:.7rem;padding:2px 7px;border-radius:var(--radius-pill);background:var(--bg);border:1px solid var(--border);color:var(--text-muted)"><i class="fa-solid ${icon}"></i> ${label}</span>`;
+    };
+
+    // Render comments list (with approval highlight)
+    const APPROVAL_RE = /\bapprov(ed|al|e)\b|\bsanction(ed)?\b|\bauthori[sz]ed?\b|\bcleared?\b|\bok(?:ay)?\b|\bverified?\b|\baccept(ed)?\b|\bpaid\b/i;
+    const REJECT_RE   = /\breject(ed)?\b|\bdenied?\b|\bdeclined?\b|\bcancell?ed?\b/i;
+    const comments    = isZoho ? (parsed.comments || []) : [];
+    const commentsHtml = comments.length ? `
+      <div style="margin-top:14px">
+        <div style="font-size:.75rem;color:var(--text-muted);font-weight:600;margin-bottom:8px">COMMENTS (${comments.length})</div>
+        <div style="display:flex;flex-direction:column;gap:8px;max-height:320px;overflow-y:auto;padding-right:2px">
+          ${comments.map(c => {
+            const isApproval = APPROVAL_RE.test(c.content);
+            const isReject   = REJECT_RE.test(c.content);
+            const highlight  = isApproval ? 'border-left:3px solid #4CAF50;background:rgba(76,175,80,.06);'
+                             : isReject   ? 'border-left:3px solid #f44336;background:rgba(244,67,54,.06);'
+                             : 'border-left:3px solid var(--border);';
+            const timeStr = c.createdAt ? new Date(Number(c.createdAt) || c.createdAt).toLocaleString() : '';
+            return `<div style="padding:8px 10px;border-radius:6px;${highlight}">
+              <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:4px">
+                <span style="font-size:.75rem;font-weight:600;color:var(--text)">${Utils.escapeHtml(c.author || 'Unknown')}</span>
+                ${timeStr ? `<span style="font-size:.7rem;color:var(--text-muted);white-space:nowrap">${Utils.escapeHtml(timeStr)}</span>` : ''}
+              </div>
+              <div style="font-size:.82rem;color:var(--text-muted);white-space:pre-wrap;word-break:break-word">${Utils.escapeHtml(c.content || '')}</div>
+              ${isApproval ? `<div style="margin-top:4px"><span style="font-size:.7rem;color:#4CAF50;font-weight:600"><i class="fa-solid fa-circle-check"></i> Approval signal detected</span></div>` : ''}
+              ${isReject   ? `<div style="margin-top:4px"><span style="font-size:.7rem;color:#f44336;font-weight:600"><i class="fa-solid fa-circle-xmark"></i> Rejection signal detected</span></div>` : ''}
+            </div>`;
+          }).join('')}
+        </div>
+      </div>` : '';
+
+    // Attachments (image evidence like WhatsApp / email screenshots)
+    const attachments = isZoho ? (parsed.attachments || []) : [];
+    const evidenceAtts = attachments.filter(a => a.kind !== 'other');
+    const attachmentsHtml = attachments.length ? `
+      <div style="margin-top:14px">
+        <div style="font-size:.75rem;color:var(--text-muted);font-weight:600;margin-bottom:8px">ATTACHMENTS (${attachments.length})</div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          ${attachments.map(a => {
+            const kindIcon = {
+              whatsapp:    'fa-brands fa-whatsapp',
+              screenshot:  'fa-camera',
+              email:       'fa-envelope',
+              'approval-doc': 'fa-file-circle-check',
+              image:       'fa-image',
+              other:       'fa-file',
+            }[a.kind] || 'fa-file';
+            const kindColor = {
+              whatsapp:    '#25D366',
+              screenshot:  '#2196F3',
+              email:       '#FF9800',
+              'approval-doc': '#4CAF50',
+              image:       '#9C27B0',
+            }[a.kind] || 'var(--text-muted)';
+            const kindLabel = {
+              whatsapp: 'WhatsApp', screenshot: 'Screenshot', email: 'Email',
+              'approval-doc': 'Approval Doc', image: 'Image', other: 'File',
+            }[a.kind] || 'File';
+            return `<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;background:var(--bg);border:1px solid var(--border)">
+              <i class="fa-solid ${kindIcon}" style="color:${kindColor};width:14px;text-align:center"></i>
+              <span style="font-size:.8rem;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${Utils.escapeHtml(a.name)}">${Utils.escapeHtml(a.name)}</span>
+              <span style="font-size:.7rem;padding:1px 6px;border-radius:4px;background:var(--surface-2,var(--border));color:var(--text-muted)">${kindLabel}</span>
+            </div>`;
+          }).join('')}
+        </div>
+        ${evidenceAtts.length ? `<div style="margin-top:6px;font-size:.72rem;color:#4CAF50"><i class="fa-solid fa-shield-check"></i> ${evidenceAtts.length} image evidence file(s) detected</div>` : ''}
+      </div>` : '';
+
     panel.innerHTML = `
-      <div style="margin-bottom:16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <div style="margin-bottom:16px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
         <span class="approval-pill ${statusClass}">
           <i class="fa-solid ${statusIcon}"></i> ${statusLabel}
         </span>
         <span style="font-size:.75rem;padding:3px 8px;border-radius:var(--radius-pill);background:var(--bg);border:1px solid var(--border);color:var(--text-muted)">
           <i class="fa-solid ${isZoho ? 'fa-link' : 'fa-file-pdf'}"></i> ${isZoho ? 'Zoho Task' : 'PDF'}
         </span>
+        ${evidenceSources.map(srcBadge).join('')}
       </div>
       <div style="display:flex;flex-direction:column;gap:10px">
         ${taskRef    ? `<div><div style="font-size:.75rem;color:var(--text-muted);font-weight:600">TASK / REFERENCE</div><div style="font-weight:600;font-family:var(--font-mono)">${Utils.escapeHtml(taskRef)}</div></div>` : ''}
@@ -789,6 +867,8 @@
               : '<span style="font-size:.8rem;color:var(--text-muted)">None detected</span>'}
           </div>
         </div>
+        ${commentsHtml}
+        ${attachmentsHtml}
       </div>`;
   }
 

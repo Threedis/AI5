@@ -191,7 +191,7 @@ const ZohoProjects = (() => {
   async function fetchTasklistTasks(projectId, tlId) {
     const base = `/portal/${enc(PORTAL_NAME)}/projects/${enc(projectId)}/tasklists/${enc(tlId)}/tasks/`;
     const attempts = [
-      base,
+      base,                         // no params
       `${base}?type=open_tasks`,
       `${base}?type=closed_tasks`,
       `${base}?status=open`,
@@ -215,6 +215,7 @@ const ZohoProjects = (() => {
         const data = await apiGet(`/portal/${enc(PORTAL_NAME)}/projects/${enc(projectId)}/tasks/${q}`);
         if (data.tasks && data.tasks.length) {
           console.debug(`[Zoho] project ${projectId} tasks via project endpoint (${type||'bare'}): ${data.tasks.length}`);
+          // If open-only, also grab closed
           if (type === 'open_tasks') {
             try {
               const closed = await apiGet(`/portal/${enc(PORTAL_NAME)}/projects/${enc(projectId)}/tasks/?type=closed_tasks`);
@@ -370,7 +371,7 @@ const ZohoProjects = (() => {
     } catch { return []; }
   }
 
-  /* ── Derive approval from comment text ─────────────────── */
+  /* ── Derive approval from comment text ───────────────────── */
   const APPROVAL_POSITIVE = /\bapprov(ed|al|e)\b|\bsanction(ed)?\b|\bauthori[sz]ed?\b|\bcleared?\b|\bok(?:ay)?\b|\bverified?\b|\baccept(ed)?\b|\bpaid\b/i;
   const APPROVAL_NEGATIVE = /\breject(ed)?\b|\bdenied?\b|\bdeclined?\b|\bcancell?ed?\b|\bdo\s+not\s+approv/i;
 

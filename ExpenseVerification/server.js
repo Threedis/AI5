@@ -131,6 +131,7 @@ async function mcpFetchTask(taskId) {
   if (detailTool) {
     const args = { task_id: taskId };
     if (PROJECT_ID) args.project_id = PROJECT_ID;
+    // Some servers require portal_id or portal_name
     args.portal_id = PORTAL_NAME;
     try {
       const data = await mcpCallTool(detailTool, args);
