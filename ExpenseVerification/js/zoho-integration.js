@@ -216,18 +216,23 @@ const ZohoProjects = (() => {
     return all;
   }
 
+  /* ── Normalize O↔0 so "S07-T1" matches "SO7-T1" ─────────── */
+  function normalizeOZ(s) { return s.replace(/[O0]/g, 'X'); }
+
   /* ── Match a task list against a display ID ─────────────── */
   function matchTask(tasks, upper, projPrefix) {
+    const upperNorm = normalizeOZ(upper);
     return tasks.find(t => {
       const key     = (t.key      || '').toUpperCase();
       const taskKey = (t.task_key || '').toUpperCase();
       if (key === upper || taskKey === upper) return true;
+      if (normalizeOZ(key) === upperNorm || normalizeOZ(taskKey) === upperNorm) return true;
 
-      // Zoho sometimes omits the "T": e.g. "S07-1" instead of "S07-T1"
+      // Zoho sometimes omits the "T": e.g. "SO7-1" instead of "SO7-T1"
       const seq = String(t.sequence_num || t.task_index || '');
       if (seq) {
-        if (projPrefix && `${projPrefix}-T${seq}` === upper) return true;
-        if (projPrefix && `${projPrefix}-${seq}`  === upper) return true;
+        if (projPrefix && normalizeOZ(`${projPrefix}-T${seq}`) === upperNorm) return true;
+        if (projPrefix && normalizeOZ(`${projPrefix}-${seq}`)  === upperNorm) return true;
       }
       return false;
     });
