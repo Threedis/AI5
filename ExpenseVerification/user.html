@@ -809,6 +809,28 @@
       return (name || '?').split(/\s+/).slice(0,2).map(w => w[0]).join('').toUpperCase();
     }
 
+    // Format comment body: detect key:value lines → table, otherwise paragraphs
+    function formatCommentBody(raw) {
+      const text  = Utils.stripHtml(raw || '').trim();
+      const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+
+      // Detect key:value pattern (e.g. "Employee Name: Ramniwash")
+      const kvLines = lines.filter(l => /^[^:]{2,40}:\s*.+/.test(l));
+      const isKvTable = kvLines.length >= 3 && kvLines.length >= lines.length * 0.5;
+
+      if (isKvTable) {
+        const rows = lines.map(l => {
+          const m = l.match(/^([^:]{2,40}):\s*(.+)/);
+          if (m) return `<tr><td style="padding:4px 10px 4px 0;font-size:.78rem;color:var(--text-muted);font-weight:600;white-space:nowrap;vertical-align:top">${Utils.escapeHtml(m[1].trim())}</td><td style="padding:4px 0;font-size:.82rem;color:var(--text);vertical-align:top">${Utils.escapeHtml(m[2].trim())}</td></tr>`;
+          return `<tr><td colspan="2" style="padding:4px 0;font-size:.82rem;color:var(--text)">${Utils.escapeHtml(l)}</td></tr>`;
+        }).join('');
+        return `<table style="border-collapse:collapse;width:100%">${rows}</table>`;
+      }
+
+      // Plain paragraphs: group non-empty lines into paragraphs
+      return lines.map(l => `<p style="margin:0 0 6px 0;font-size:.84rem;color:var(--text);line-height:1.6">${Utils.escapeHtml(l)}</p>`).join('');
+    }
+
     const commentsHtml = comments.length ? `
       <div style="margin-top:18px">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
@@ -816,11 +838,11 @@
           <span style="font-weight:700;font-size:.9rem">Comments</span>
           <span style="background:var(--primary);color:#fff;border-radius:99px;font-size:.7rem;font-weight:700;padding:1px 8px">${comments.length}</span>
         </div>
-        <div style="display:flex;flex-direction:column;gap:12px;max-height:380px;overflow-y:auto;padding-right:4px">
-          ${comments.map((c, idx) => {
+        <div style="display:flex;flex-direction:column;gap:14px;max-height:480px;overflow-y:auto;padding-right:4px">
+          ${comments.map(c => {
             const isApproval = APPROVAL_RE.test(c.content);
             const isReject   = REJECT_RE.test(c.content);
-            const name       = c.author || 'Unknown';
+            const name       = c.author || 'Team Member';
             const ini        = initials(name);
             const avatarBg   = avatarColor(name);
             const relT       = relTime(c.createdAt);
@@ -830,22 +852,25 @@
               return isNaN(d) ? '' : d.toLocaleString();
             })();
             const borderColor = isApproval ? '#4CAF50' : isReject ? '#f44336' : 'var(--border)';
-            const bgColor     = isApproval ? 'rgba(76,175,80,.05)' : isReject ? 'rgba(244,67,54,.05)' : 'var(--bg-card,var(--bg))';
+            const topBar      = isApproval ? 'background:#4CAF50' : isReject ? 'background:#f44336' : 'display:none';
             const badge       = isApproval
-              ? `<span style="display:inline-flex;align-items:center;gap:4px;font-size:.72rem;font-weight:700;color:#fff;background:#4CAF50;border-radius:99px;padding:2px 9px"><i class="fa-solid fa-circle-check"></i> Approved</span>`
+              ? `<span style="display:inline-flex;align-items:center;gap:4px;font-size:.72rem;font-weight:700;color:#fff;background:#4CAF50;border-radius:99px;padding:2px 10px"><i class="fa-solid fa-circle-check"></i> Approved</span>`
               : isReject
-              ? `<span style="display:inline-flex;align-items:center;gap:4px;font-size:.72rem;font-weight:700;color:#fff;background:#f44336;border-radius:99px;padding:2px 9px"><i class="fa-solid fa-circle-xmark"></i> Rejected</span>`
+              ? `<span style="display:inline-flex;align-items:center;gap:4px;font-size:.72rem;font-weight:700;color:#fff;background:#f44336;border-radius:99px;padding:2px 10px"><i class="fa-solid fa-circle-xmark"></i> Rejected</span>`
               : '';
             return `
             <div style="display:flex;gap:10px;align-items:flex-start">
-              <div style="flex-shrink:0;width:34px;height:34px;border-radius:50%;background:${avatarBg};color:#fff;display:flex;align-items:center;justify-content:center;font-size:.72rem;font-weight:700;letter-spacing:.02em">${ini}</div>
+              <div title="${Utils.escapeHtml(name)}" style="flex-shrink:0;width:36px;height:36px;border-radius:50%;background:${avatarBg};color:#fff;display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:700">${ini}</div>
               <div style="flex:1;min-width:0">
-                <div style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:5px">
-                  <span style="font-weight:700;font-size:.85rem;color:var(--text)">${Utils.escapeHtml(name)}</span>
-                  ${relT ? `<span style="font-size:.75rem;color:var(--text-muted)" title="${Utils.escapeHtml(absT)}">${relT}</span>` : ''}
+                <div style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:6px">
+                  <span style="font-weight:700;font-size:.88rem;color:var(--text)">${Utils.escapeHtml(name)}</span>
+                  ${relT ? `<span style="font-size:.74rem;color:var(--text-muted)" title="${Utils.escapeHtml(absT)}">${relT}</span>` : ''}
                   ${badge}
                 </div>
-                <div style="background:${bgColor};border:1px solid ${borderColor};border-radius:10px;border-top-left-radius:2px;padding:10px 13px;font-size:.84rem;color:var(--text);line-height:1.55;white-space:pre-wrap;word-break:break-word">${Utils.escapeHtml(Utils.stripHtml(c.content || ''))}</div>
+                <div style="border:1px solid ${borderColor};border-radius:10px;border-top-left-radius:2px;overflow:hidden">
+                  ${isApproval || isReject ? `<div style="height:3px;${topBar}"></div>` : ''}
+                  <div style="padding:11px 14px">${formatCommentBody(c.content)}</div>
+                </div>
               </div>
             </div>`;
           }).join('')}
@@ -889,37 +914,57 @@
         ${evidenceAtts.length ? `<div style="margin-top:6px;font-size:.72rem;color:#4CAF50"><i class="fa-solid fa-shield-check"></i> ${evidenceAtts.length} image evidence file(s) detected</div>` : ''}
       </div>` : '';
 
+    // Build detail rows for the info grid
+    const detailRow = (label, value) => value
+      ? `<tr>
+           <td style="padding:5px 12px 5px 0;font-size:.74rem;color:var(--text-muted);font-weight:700;white-space:nowrap;vertical-align:top;text-transform:uppercase;letter-spacing:.04em">${label}</td>
+           <td style="padding:5px 0;font-size:.85rem;color:var(--text);vertical-align:top;word-break:break-word">${value}</td>
+         </tr>`
+      : '';
+
     panel.innerHTML = `
-      <div style="margin-bottom:16px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-        <span class="approval-pill ${statusClass}">
+      <!-- ── Approval Source bar (horizontal) ── -->
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 14px;background:var(--bg);border:1px solid var(--border);border-radius:10px;margin-bottom:14px">
+        <span class="approval-pill ${statusClass}" style="padding:6px 14px">
           <i class="fa-solid ${statusIcon}"></i> ${statusLabel}
         </span>
-        <span style="font-size:.75rem;padding:3px 8px;border-radius:var(--radius-pill);background:var(--bg);border:1px solid var(--border);color:var(--text-muted)">
+        <span style="font-size:.75rem;padding:4px 10px;border-radius:var(--radius-pill);background:var(--bg-card,#fff);border:1px solid var(--border);color:var(--text-muted)">
           <i class="fa-solid ${isZoho ? 'fa-link' : 'fa-file-pdf'}"></i> ${isZoho ? 'Zoho Task' : 'PDF'}
         </span>
         ${evidenceSources.map(srcBadge).join('')}
       </div>
-      <div style="display:flex;flex-direction:column;gap:10px">
-        ${taskRef    ? `<div><div style="font-size:.75rem;color:var(--text-muted);font-weight:600">TASK / REFERENCE</div><div style="font-weight:600;font-family:var(--font-mono)">${Utils.escapeHtml(taskRef)}</div></div>` : ''}
-        ${taskLabel  ? `<div><div style="font-size:.75rem;color:var(--text-muted);font-weight:600">TASK NAME</div><div>${Utils.escapeHtml(taskLabel)}</div></div>` : ''}
-        ${projectLbl ? `<div><div style="font-size:.75rem;color:var(--text-muted);font-weight:600">${isZoho ? 'PROJECT' : 'DEPARTMENT'}</div><div>${Utils.escapeHtml(projectLbl)}</div></div>` : ''}
-        ${taskStatus ? `<div><div style="font-size:.75rem;color:var(--text-muted);font-weight:600">ZOHO STATUS</div><div>${Utils.escapeHtml(taskStatus)}</div></div>` : ''}
-        ${submitter  ? `<div><div style="font-size:.75rem;color:var(--text-muted);font-weight:600">SUBMITTED BY</div><div>${Utils.escapeHtml(submitter)}</div></div>` : ''}
-        ${approvers.length ? `<div><div style="font-size:.75rem;color:var(--text-muted);font-weight:600">APPROVED BY</div><div>${approvers.map(a => Utils.escapeHtml(a)).join(', ')}</div></div>` : ''}
-        ${assignees.length ? `<div><div style="font-size:.75rem;color:var(--text-muted);font-weight:600">ASSIGNEES</div><div style="font-size:.82rem">${assignees.map(a => Utils.escapeHtml(a)).join(', ')}</div></div>` : ''}
-        ${dates.length  ? `<div><div style="font-size:.75rem;color:var(--text-muted);font-weight:600">DATES FOUND</div><div style="font-size:.8rem">${dates.map(d => Utils.escapeHtml(d)).join(' · ')}</div></div>` : ''}
-        ${amounts.length ? `<div><div style="font-size:.75rem;color:var(--text-muted);font-weight:600">AMOUNTS FOUND</div><div style="font-size:.8rem">${amounts.map(a => Utils.formatCurrency(a)).join(' · ')}</div></div>` : ''}
-        ${pageCount != null ? `<div><div style="font-size:.75rem;color:var(--text-muted);font-weight:600">PAGES</div><div>${pageCount}</div></div>` : ''}
-        <div><div style="font-size:.75rem;color:var(--text-muted);font-weight:600">EMP IDs DETECTED</div>
-          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">
-            ${empIds.length
-              ? empIds.map(id => `<span class="badge badge-blue">${Utils.escapeHtml(id)}</span>`).join('')
-              : '<span style="font-size:.8rem;color:var(--text-muted)">None detected</span>'}
-          </div>
+
+      <!-- ── Approval Details grid ── -->
+      <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:2px">
+        <div style="padding:9px 14px;background:var(--bg);border-bottom:1px solid var(--border);font-size:.8rem;font-weight:700;color:var(--text-muted);letter-spacing:.05em">APPROVAL DETAILS</div>
+        <div style="padding:10px 14px">
+          <table style="border-collapse:collapse;width:100%">
+            ${detailRow('Task / Ref',   taskRef   ? `<span style="font-family:var(--font-mono);font-weight:600">${Utils.escapeHtml(taskRef)}</span>` : '')}
+            ${detailRow('Task Name',    taskLabel  ? Utils.escapeHtml(taskLabel)  : '')}
+            ${detailRow(isZoho ? 'Project' : 'Department', projectLbl ? Utils.escapeHtml(projectLbl) : '')}
+            ${detailRow('Zoho Status',  taskStatus ? Utils.escapeHtml(taskStatus) : '')}
+            ${detailRow('Submitted By', submitter  ? Utils.escapeHtml(submitter)  : '')}
+            ${detailRow('Approved By',  approvers.length ? approvers.map(a => `<span style="display:inline-block;background:rgba(76,175,80,.12);color:#2e7d32;border-radius:99px;padding:1px 9px;font-size:.78rem;font-weight:600;margin:1px 3px 1px 0">${Utils.escapeHtml(a)}</span>`).join('') : '')}
+            ${detailRow('Assignees',    assignees.length ? assignees.map(a => Utils.escapeHtml(a)).join(', ') : '')}
+            ${detailRow('Dates',        dates.length  ? dates.map(d => Utils.escapeHtml(d)).join(' · ')         : '')}
+            ${detailRow('Amounts',      amounts.length? amounts.map(a => Utils.formatCurrency(a)).join(' · ')   : '')}
+            ${detailRow('Pages',        pageCount != null ? String(pageCount) : '')}
+            <tr>
+              <td style="padding:5px 12px 5px 0;font-size:.74rem;color:var(--text-muted);font-weight:700;white-space:nowrap;vertical-align:top;text-transform:uppercase;letter-spacing:.04em">Emp IDs</td>
+              <td style="padding:5px 0;vertical-align:top">
+                <div style="display:flex;flex-wrap:wrap;gap:5px">
+                  ${empIds.length
+                    ? empIds.map(id => `<span class="badge badge-blue">${Utils.escapeHtml(id)}</span>`).join('')
+                    : '<span style="font-size:.8rem;color:var(--text-muted)">None detected</span>'}
+                </div>
+              </td>
+            </tr>
+          </table>
         </div>
-        ${commentsHtml}
-        ${attachmentsHtml}
-      </div>`;
+      </div>
+
+      ${commentsHtml}
+      ${attachmentsHtml}`;
   }
 
   /* ── Emp quick-check table (used by both Zoho and PDF) ──── */

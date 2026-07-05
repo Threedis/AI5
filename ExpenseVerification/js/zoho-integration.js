@@ -354,8 +354,16 @@ const ZohoProjects = (() => {
         const tmp = document.createElement('div');
         tmp.innerHTML = raw;
         const plain = tmp.textContent || tmp.innerText || raw;
+        // Zoho comment author: prefer display_name, then name, then email prefix, never a raw id
+        const addedBy = c.added_by || {};
+        const authorName = addedBy.display_name
+          || addedBy.name
+          || (addedBy.email ? addedBy.email.split('@')[0] : '')
+          || (typeof addedBy === 'string' && isNaN(addedBy) ? addedBy : '')
+          || '';
         return {
-          author:    c.added_by?.display_name || c.added_by || '',
+          author:    authorName,
+          authorId:  addedBy.id || addedBy.zpuid || '',
           content:   plain.trim(),
           createdAt: c.time_long || c.added_time_string || '',
         };
