@@ -794,7 +794,7 @@
                 <span style="font-size:.75rem;font-weight:600;color:var(--text)">${Utils.escapeHtml(c.author || 'Unknown')}</span>
                 ${timeStr ? `<span style="font-size:.7rem;color:var(--text-muted);white-space:nowrap">${Utils.escapeHtml(timeStr)}</span>` : ''}
               </div>
-              <div style="font-size:.82rem;color:var(--text-muted);white-space:pre-wrap;word-break:break-word">${Utils.escapeHtml(c.content || '')}</div>
+              <div style="font-size:.82rem;color:var(--text-muted);white-space:pre-wrap;word-break:break-word">${Utils.escapeHtml(Utils.stripHtml(c.content || ''))}</div>
               ${isApproval ? `<div style="margin-top:4px"><span style="font-size:.7rem;color:#4CAF50;font-weight:600"><i class="fa-solid fa-circle-check"></i> Approval signal detected</span></div>` : ''}
               ${isReject   ? `<div style="margin-top:4px"><span style="font-size:.7rem;color:#f44336;font-weight:600"><i class="fa-solid fa-circle-xmark"></i> Rejection signal detected</span></div>` : ''}
             </div>`;

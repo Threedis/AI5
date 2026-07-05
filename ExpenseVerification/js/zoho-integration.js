@@ -348,11 +348,18 @@ const ZohoProjects = (() => {
     if (!projectId) return [];
     try {
       const data = await apiGet(`/portal/${enc(PORTAL_NAME)}/projects/${enc(projectId)}/tasks/${enc(taskId)}/comments/`);
-      return (data.comments || []).map(c => ({
-        author:    c.added_by?.display_name || c.added_by || '',
-        content:   c.content || '',
-        createdAt: c.time_long || c.added_time_string || '',
-      }));
+      return (data.comments || []).map(c => {
+        const raw = c.content || '';
+        // Strip HTML tags Zoho may embed in comment bodies
+        const tmp = document.createElement('div');
+        tmp.innerHTML = raw;
+        const plain = tmp.textContent || tmp.innerText || raw;
+        return {
+          author:    c.added_by?.display_name || c.added_by || '',
+          content:   plain.trim(),
+          createdAt: c.time_long || c.added_time_string || '',
+        };
+      });
     } catch { return []; }
   }
 

@@ -81,6 +81,13 @@ const Utils = (() => {
     return el.innerHTML;
   }
 
+  /** Strip HTML tags and decode entities, returning plain text */
+  function stripHtml(html) {
+    const el = document.createElement('div');
+    el.innerHTML = String(html ?? '');
+    return el.textContent || el.innerText || '';
+  }
+
   /** Download a Blob as a file */
   function downloadBlob(blob, filename) {
     const url = URL.createObjectURL(blob);
@@ -166,7 +173,7 @@ const Utils = (() => {
   return {
     formatDate, formatDateTime, formatCurrency, formatNumber,
     timeAgo, uuid, deepClone, debounce, throttle,
-    escapeHtml, downloadBlob,
+    escapeHtml, stripHtml, downloadBlob,
     readFileAsArrayBuffer, readFileAsText,
     isValidIFSC, isValidAccountNumber, isValidPAN,
     getInitials, titleCase, normalize, sleep, formatFileSize, isEmpty
