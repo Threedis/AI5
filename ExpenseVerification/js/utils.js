@@ -134,18 +134,6 @@ const Utils = (() => {
     return /^[A-Z]{5}[0-9]{4}[A-Z]$/.test(String(pan ?? '').trim().toUpperCase());
   }
 
-  // Reserved/special-use TLDs (RFC 2606, RFC 6762) that Supabase Auth
-  // rejects as non-routable, so we catch them before the signUp round-trip.
-  const NON_ROUTABLE_TLDS = ['local', 'test', 'example', 'invalid', 'localhost'];
-
-  /** Validate an email address, flagging reserved/non-routable TLDs (.local, .test, etc.) */
-  function isValidEmail(email) {
-    const s = String(email ?? '').trim();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s)) return false;
-    const tld = s.split('.').pop().toLowerCase();
-    return !NON_ROUTABLE_TLDS.includes(tld);
-  }
-
   /** Get initials from a name */
   function getInitials(name) {
     return String(name ?? '').split(' ')
@@ -187,7 +175,7 @@ const Utils = (() => {
     timeAgo, uuid, deepClone, debounce, throttle,
     escapeHtml, stripHtml, downloadBlob,
     readFileAsArrayBuffer, readFileAsText,
-    isValidIFSC, isValidAccountNumber, isValidPAN, isValidEmail,
+    isValidIFSC, isValidAccountNumber, isValidPAN,
     getInitials, titleCase, normalize, sleep, formatFileSize, isEmpty
   };
 })();

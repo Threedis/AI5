@@ -179,9 +179,12 @@ const Auth = (() => {
   }
 
   /* ── Admin: create user ─────────────────────────────────── */
-  async function adminCreateUser({ username, email, password, role, displayName }) {
+  // Login is by username, so email is only an internal identifier Supabase Auth
+  // requires — synthesize one instead of asking the admin to supply a real address.
+  async function adminCreateUser({ username, password, role, displayName }) {
     // Create auth user via Supabase Admin (requires service role in a backend)
     // For client-side: use sign-up then update profile
+    const email = `${username}@expenseverify.com`;
     const { data, error } = await sb().auth.signUp({ email, password });
     if (error) throw new Error(error.message);
     const uid = data.user?.id;

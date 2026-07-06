@@ -546,10 +546,6 @@
           <label class="form-label">Display Name</label>
           <input type="text" class="form-control" id="m-displayname" value="${Utils.escapeHtml(user?.display_name||'')}" placeholder="John Smith">
         </div>
-        ${!isEdit ? `<div class="form-group">
-          <label class="form-label">Email <span style="color:var(--accent-red)">*</span></label>
-          <input type="email" class="form-control" id="m-email" placeholder="user@company.com">
-        </div>` : ''}
         <div class="form-group">
           <label class="form-label">Role <span style="color:var(--accent-red)">*</span></label>
           <select class="form-control" id="m-role">
@@ -583,18 +579,12 @@
     el.querySelector('#modal-save').addEventListener('click', async () => {
       const username    = el.querySelector('#m-username').value.trim();
       const displayName = el.querySelector('#m-displayname').value.trim();
-      const email       = el.querySelector('#m-email')?.value.trim() || '';
       const role        = el.querySelector('#m-role').value;
       const department  = el.querySelector('#m-dept').value.trim();
       const password    = el.querySelector('#m-password').value;
       const status      = el.querySelector('#m-status').value;
 
       if (!username)                       { App.Toast.error('Validation','Username required.'); return; }
-      if (!isEdit && !email)               { App.Toast.error('Validation','Email required.'); return; }
-      if (!isEdit && !Utils.isValidEmail(email)) {
-        App.Toast.error('Validation','Enter a real, routable email address — domains like .local, .test or .example are rejected by the auth provider.');
-        return;
-      }
       if (!isEdit && !password)            { App.Toast.error('Validation','Password required.'); return; }
       if (!isEdit && password.length < 8)  { App.Toast.error('Validation','Password must be ≥ 8 chars.'); return; }
       if (!isEdit) {
@@ -610,7 +600,7 @@
           await Auth.adminUpdateUser(user.id, updates);
           if (password) await Auth.changePassword(password);
         } else {
-          await Auth.adminCreateUser({ username, email, password, role, displayName });
+          await Auth.adminCreateUser({ username, password, role, displayName });
           await Auth.adminUpdateUser(
             (await Database.getAll('users')).find(u => u.username === username)?.id,
             { department, status }
