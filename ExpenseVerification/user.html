@@ -408,15 +408,15 @@
                 <i class="fa-solid fa-circle-check" style="color:var(--accent-green);font-size:1.4rem"></i>
                 <div>
                   <div style="font-weight:700;color:var(--accent-green)">All employees verified in both databases</div>
-                  <div style="font-size:.8rem;color:var(--text-muted)">Ready to generate expense payment file</div>
+                  <div id="gen-expense-subtitle" style="font-size:.8rem;color:var(--text-muted)">Ready to generate expense payment file</div>
                 </div>
               </div>
               <div style="display:flex;gap:10px">
-                <button class="btn btn-sm" id="btn-gen-sal" style="background:#0A5F0A;color:#fff;border:none;gap:6px">
+                <button class="btn btn-sm" id="btn-gen-sal" style="display:none;background:#0A5F0A;color:#fff;border:none;gap:6px">
                   <i class="fa-solid fa-file-arrow-down"></i> SAL File
                 </button>
-                <button class="btn btn-sm" id="btn-gen-nas" style="background:#005A9E;color:#fff;border:none;gap:6px">
-                  <i class="fa-solid fa-file-arrow-down"></i> NAS File
+                <button class="btn btn-sm" id="btn-gen-nas" style="display:none;background:#005A9E;color:#fff;border:none;gap:6px">
+                  <i class="fa-solid fa-file-arrow-down"></i> NES File
                 </button>
               </div>
             </div>
@@ -1309,6 +1309,22 @@
     const missingAcc = verifyEmpIds.filter(id => !accMap.has(id.toUpperCase()));
     const allFound   = missingHR.length === 0 && missingAcc.length === 0;
 
+    if (allFound) {
+      // Detect which file type(s) needed based on bank name
+      let hasSAL = false, hasNES = false;
+      for (const id of verifyEmpIds) {
+        const acc = accMap.get(id.toUpperCase());
+        const bank = (acc?.bankName || '').toLowerCase();
+        if (/hdfc/i.test(bank)) hasSAL = true; else hasNES = true;
+      }
+      document.getElementById('btn-gen-sal').style.display = hasSAL ? '' : 'none';
+      document.getElementById('btn-gen-nas').style.display = hasNES ? '' : 'none';
+      const subtitle = [];
+      if (hasSAL) subtitle.push('HDFC → SAL file');
+      if (hasNES) subtitle.push('Other bank → NES file');
+      const sub = document.getElementById('gen-expense-subtitle');
+      if (sub) sub.textContent = subtitle.join(' · ') || 'Ready to generate expense payment file';
+    }
     section.style.display = allFound ? '' : 'none';
 
     if (valMsgs && valInner) {
@@ -1337,10 +1353,9 @@
         const hr  = hrMap.get(key);
         const acc = accMap.get(key);
         if (!hr || !acc) continue;
-        const sec  = (acc.section || '').toUpperCase();
-        const type = /^NES$|^NPS$|^NAS$/i.test(sec) ? 'NAS'
-                   : /^SAL/i.test(sec) ? 'SAL'
-                   : (acc._sheet && /nes|nas|nps/i.test(acc._sheet) ? 'NAS' : 'SAL');
+        // SAL = HDFC bank, NES = all other banks
+        const bank = (acc.bankName || hr.bankName || '').toLowerCase();
+        const type = /hdfc/i.test(bank) ? 'SAL' : 'NES';
         if (type !== forceType) continue;
         rows.push({
           empId:  id,
@@ -1353,7 +1368,7 @@
         });
       }
 
-      if (!rows.length) { App.Toast.warning('No Records', `No ${forceType} type employees found.`); return; }
+      if (!rows.length) { App.Toast.warning('No Records', `No ${forceType === 'SAL' ? 'HDFC bank' : 'non-HDFC bank'} employees found for ${forceType} file.`); return; }
 
       const header  = 'Emp ID,Name,Bank,Account No,IFSC,Amount,Type';
       const csvRows = rows.map(r =>
@@ -1377,7 +1392,7 @@
   }
 
   document.getElementById('btn-gen-sal').addEventListener('click', () => generateExpenseFile('SAL'));
-  document.getElementById('btn-gen-nas').addEventListener('click', () => generateExpenseFile('NAS'));
+  document.getElementById('btn-gen-nas').addEventListener('click', () => generateExpenseFile('NES'));
 
   function renderSearchResults(results) {
     document.getElementById('search-prompt').style.display       = 'none';
