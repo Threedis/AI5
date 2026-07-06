@@ -1,15 +1,13 @@
 /**
- * auth.js — Authentication, session management, role-based access
+ * auth.js — Authentication via Supabase Auth + profiles table
  * Employee Expense Verification System
  */
 
 const Auth = (() => {
 
-  const SESSION_KEY   = 'evs_session';
-  const REMEMBER_KEY  = 'evs_remember';
   const INACTIVITY_MS = 30 * 60 * 1000; // 30 minutes
-
   let _inactivityTimer = null;
+  let _profile = null; // cached profile {id, username, display_name, role}
 
   /* ── Role definitions ───────────────────────────────────── */
   const ROLES = {
@@ -28,98 +26,129 @@ const Auth = (() => {
     'user.html':      ['admin', 'hr', 'accounts', 'user']
   };
 
-  /* ── Get current session ────────────────────────────────── */
-  function getSession() {
-    const raw = sessionStorage.getItem(SESSION_KEY)
-              || localStorage.getItem(SESSION_KEY);
-    if (!raw) return null;
+  function sb() { return getSupabase(); }
+
+  /* ── Login with username + password ────────────────────── */
+  async function login(username, password, remember = false) {
+    // Look up email from profiles table by username
+    const { data: prof, error: profErr } = await sb()
+      .from('profiles')
+      .select('email, role, display_name, username')
+      .eq('username', username.trim())
+      .maybeSingle();
+
+    if (profErr || !prof) throw new Error('User not found.');
+
+    const { data, error } = await sb().auth.signInWithPassword({
+      email:    prof.email,
+      password: password,
+    });
+    if (error) throw new Error('Invalid username or password.');
+
+    _profile = { ...prof, id: data.user.id };
+
+    if (remember) {
+      localStorage.setItem('evs_remember', username.trim());
+    }
+    return _profile;
+  }
+
+  /* ── Logout ─────────────────────────────────────────────── */
+  async function logout(reason = '') {
     try {
-      const sess = JSON.parse(raw);
-      if (sess.expires && Date.now() > sess.expires) {
-        clearSession();
-        return null;
-      }
-      return sess;
-    } catch { return null; }
-  }
-
-  /* ── Save session ───────────────────────────────────────── */
-  function saveSession(user, remember = false) {
-    const sess = {
-      ...user,
-      loginAt: Date.now(),
-      expires: remember ? Date.now() + (7 * 24 * 60 * 60 * 1000) : null
-    };
-    const store = remember ? localStorage : sessionStorage;
-    store.setItem(SESSION_KEY, JSON.stringify(sess));
-    if (remember) localStorage.setItem(REMEMBER_KEY, user.username);
-  }
-
-  /* ── Clear session ──────────────────────────────────────── */
-  function clearSession() {
-    sessionStorage.removeItem(SESSION_KEY);
-    localStorage.removeItem(SESSION_KEY);
+      await Audit.log({ module: 'Auth', action: 'Logout', status: 'success', detail: reason || 'User logged out' });
+    } catch {}
+    _profile = null;
+    await sb().auth.signOut();
     clearInactivityTimer();
+    const q = reason ? `?reason=${encodeURIComponent(reason)}` : '';
+    window.location.href = `login.html${q}`;
   }
 
-  /* ── Check if logged in ─────────────────────────────────── */
-  function isLoggedIn() {
-    return getSession() !== null;
+  /* ── Get current Supabase session ───────────────────────── */
+  async function getSessionAsync() {
+    const { data: { session } } = await sb().auth.getSession();
+    return session;
   }
 
-  /* ── Get current user ───────────────────────────────────── */
+  /* ── Get current profile (cached) ──────────────────────── */
+  async function fetchProfile() {
+    if (_profile) return _profile;
+    const { data: { user } } = await sb().auth.getUser();
+    if (!user) return null;
+    const { data: prof } = await sb()
+      .from('profiles')
+      .select('username, display_name, role, email')
+      .eq('id', user.id)
+      .maybeSingle();
+    if (!prof) return null;
+    _profile = { ...prof, id: user.id };
+    return _profile;
+  }
+
+  /* ── Synchronous current user (from cache) ──────────────── */
   function getCurrentUser() {
-    return getSession();
+    return _profile;
   }
 
-  /* ── Has role ───────────────────────────────────────────── */
-  function hasRole(role) {
-    const sess = getSession();
-    if (!sess) return false;
-    if (Array.isArray(role)) return role.includes(sess.role);
-    return sess.role === role;
+  /* ── Is logged in (sync check via cached profile) ───────── */
+  function isLoggedIn() {
+    return !!_profile;
   }
 
-  /* ── Can access current page ────────────────────────────── */
-  function canAccessPage(page) {
-    const sess = getSession();
-    if (!sess) return false;
-    const allowed = ROUTE_ACCESS[page] || [];
-    return allowed.includes(sess.role);
-  }
-
-  /* ── Guard: redirect to login if not authenticated ──────── */
-  function requireAuth(allowedRoles = null) {
-    if (!isLoggedIn()) {
+  /* ── requireAuth — call at top of each protected page ───── */
+  async function requireAuth(allowedRoles = null) {
+    const session = await getSessionAsync();
+    if (!session) {
       window.location.href = 'login.html?reason=session_expired';
       return false;
     }
-    const sess = getSession();
-    if (allowedRoles && !allowedRoles.includes(sess.role)) {
+    const profile = await fetchProfile();
+    if (!profile) {
+      window.location.href = 'login.html?reason=session_expired';
+      return false;
+    }
+    if (allowedRoles && !allowedRoles.includes(profile.role)) {
       window.location.href = 'dashboard.html?reason=unauthorized';
       return false;
     }
     return true;
   }
 
-  /* ── Guard: redirect to dashboard if already logged in ─── */
-  function requireGuest() {
-    if (isLoggedIn()) {
+  /* ── requireGuest — call on login page ──────────────────── */
+  async function requireGuest() {
+    const session = await getSessionAsync();
+    if (session) {
       window.location.href = 'dashboard.html';
       return false;
     }
     return true;
   }
 
-  /* ── Inactivity auto-logout ─────────────────────────────── */
+  /* ── Role helpers ───────────────────────────────────────── */
+  function hasRole(role) {
+    if (!_profile) return false;
+    return Array.isArray(role) ? role.includes(_profile.role) : _profile.role === role;
+  }
+
+  function canAccessPage(page) {
+    if (!_profile) return false;
+    return (ROUTE_ACCESS[page] || []).includes(_profile.role);
+  }
+
+  function getRoleInfo(role) {
+    return ROLES[role] || { label: role, color: 'gray', icon: 'fa-user' };
+  }
+
+  function getAllRoles() {
+    return Object.entries(ROLES).map(([key, val]) => ({ key, ...val }));
+  }
+
+  /* ── Inactivity timer ───────────────────────────────────── */
   function resetInactivityTimer() {
     clearInactivityTimer();
-    _inactivityTimer = setTimeout(() => {
-      const sess = getSession();
-      if (sess) {
-        clearSession();
-        window.location.href = `login.html?reason=inactivity`;
-      }
+    _inactivityTimer = setTimeout(async () => {
+      if (await getSessionAsync()) await logout('inactivity');
     }, INACTIVITY_MS);
   }
 
@@ -135,54 +164,70 @@ const Auth = (() => {
     resetInactivityTimer();
   }
 
-  /* ── Logout ─────────────────────────────────────────────── */
-  function logout(reason = '') {
-    const sess = getSession();
-    if (sess) {
-      Audit.log({
-        module: 'Auth',
-        action: 'Logout',
-        status: 'success',
-        detail: reason || 'User logged out'
-      }).catch(() => {});
-    }
-    clearSession();
-    const q = reason ? `?reason=${encodeURIComponent(reason)}` : '';
-    window.location.href = `login.html${q}`;
-  }
-
-  /* ── Get remembered username ────────────────────────────── */
+  /* ── Remember username ──────────────────────────────────── */
   function getRememberedUsername() {
-    return localStorage.getItem(REMEMBER_KEY) || '';
+    return localStorage.getItem('evs_remember') || '';
   }
 
-  /* ── Role helpers ───────────────────────────────────────── */
-  function getRoleInfo(role) {
-    return ROLES[role] || { label: role, color: 'gray', icon: 'fa-user' };
+  /* ── Update profile ─────────────────────────────────────── */
+  async function updateSessionUser(data) {
+    if (!_profile) return;
+    const { error } = await sb().from('profiles').update(data).eq('id', _profile.id);
+    if (error) throw new Error(error.message);
+    _profile = { ..._profile, ...data };
   }
 
-  function getAllRoles() {
-    return Object.entries(ROLES).map(([key, val]) => ({ key, ...val }));
+  /* ── Admin: create user ─────────────────────────────────── */
+  async function adminCreateUser({ username, email, password, role, displayName }) {
+    // Create auth user via Supabase Admin (requires service role in a backend)
+    // For client-side: use sign-up then update profile
+    const { data, error } = await sb().auth.signUp({ email, password });
+    if (error) throw new Error(error.message);
+    const uid = data.user?.id;
+    if (!uid) throw new Error('User creation failed.');
+    const { error: profErr } = await sb().from('profiles').upsert({
+      id: uid, username, email, display_name: displayName, role,
+    });
+    if (profErr) throw new Error(profErr.message);
+    return uid;
   }
 
-  /* ── Update session user data ───────────────────────────── */
-  function updateSessionUser(data) {
-    const sess = getSession();
-    if (!sess) return;
-    const updated = { ...sess, ...data };
-    const inLocal = !!localStorage.getItem(SESSION_KEY);
-    const store   = inLocal ? localStorage : sessionStorage;
-    store.setItem(SESSION_KEY, JSON.stringify(updated));
+  /* ── Admin: list all users ──────────────────────────────── */
+  async function getAllUsers() {
+    const { data, error } = await sb().from('profiles').select('*').order('username');
+    if (error) throw new Error(error.message);
+    return data || [];
+  }
+
+  /* ── Admin: delete user ─────────────────────────────────── */
+  async function adminDeleteUser(userId) {
+    const { error } = await sb().from('profiles').delete().eq('id', userId);
+    if (error) throw new Error(error.message);
+  }
+
+  /* ── Admin: update user role / display name ─────────────── */
+  async function adminUpdateUser(userId, updates) {
+    const { error } = await sb().from('profiles').update(updates).eq('id', userId);
+    if (error) throw new Error(error.message);
+  }
+
+  /* ── Change password ────────────────────────────────────── */
+  async function changePassword(newPassword) {
+    const { error } = await sb().auth.updateUser({ password: newPassword });
+    if (error) throw new Error(error.message);
   }
 
   return {
     ROLES, ROUTE_ACCESS,
-    getSession, saveSession, clearSession,
-    isLoggedIn, getCurrentUser, hasRole, canAccessPage,
+    login, logout,
+    getSessionAsync, fetchProfile,
+    getCurrentUser, isLoggedIn, hasRole, canAccessPage,
     requireAuth, requireGuest,
     startInactivityWatch, resetInactivityTimer,
-    logout,
-    getRememberedUsername, getRoleInfo, getAllRoles,
-    updateSessionUser
+    getRememberedUsername,
+    getRoleInfo, getAllRoles,
+    updateSessionUser,
+    adminCreateUser, getAllUsers, adminDeleteUser, adminUpdateUser,
+    changePassword,
   };
 })();

@@ -390,6 +390,8 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/supabase-client.js"></script>
 <script src="js/utils.js"></script>
 <script src="js/database.js"></script>
 <script src="js/auth.js"></script>
@@ -400,7 +402,7 @@
 
 <script>
 (async () => {
-  if (!Auth.requireAuth(['admin', 'accounts'])) return;
+  if (!await Auth.requireAuth(['admin', 'accounts'])) return;
   const sess = Auth.getCurrentUser();
   await App.init();
 

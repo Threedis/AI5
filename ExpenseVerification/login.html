@@ -159,7 +159,7 @@
 
     <div class="login-footer">
       <p>Employee Expense Verification System &copy; 2025</p>
-      <p style="margin-top:4px;">All data is encrypted and stored locally in your browser.</p>
+      <p style="margin-top:4px;">All data is securely stored in the cloud and shared across devices.</p>
     </div>
   </div>
 
@@ -555,6 +555,8 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
 
 <!-- App scripts -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/supabase-client.js"></script>
 <script src="js/utils.js"></script>
 <script src="js/database.js"></script>
 <script src="js/auth.js"></script>
@@ -562,12 +564,7 @@
 <script src="js/app.js"></script>
 
 <script>
-/**
- * Login page controller
- */
 (async () => {
-
-  await Database.open();
 
   /* ── Handle URL messages ────────────────────────────────── */
   const params  = new URLSearchParams(window.location.search);
@@ -575,18 +572,28 @@
   const msgEl   = document.getElementById('session-msg');
   const msgText = document.getElementById('session-msg-text');
 
-  if (reason === 'inactivity') {
-    msgEl.classList.add('show', 'warning');
-    msgText.textContent = 'You were signed out due to inactivity. Please sign in again.';
-  } else if (reason === 'logout') {
+  const MSG = {
+    inactivity:      ['warning', 'You were signed out due to inactivity. Please sign in again.'],
+    logout:          ['',        'You have been successfully signed out.'],
+    unauthorized:    ['warning', 'You do not have permission to access that page.'],
+    session_expired: ['warning', 'Your session has expired. Please sign in again.'],
+  };
+  if (MSG[reason]) {
+    const [cls, txt] = MSG[reason];
     msgEl.classList.add('show');
-    msgText.textContent = 'You have been successfully signed out.';
-  } else if (reason === 'unauthorized') {
-    msgEl.classList.add('show', 'warning');
-    msgText.textContent = 'You do not have permission to access that page.';
-  } else if (reason === 'session_expired') {
-    msgEl.classList.add('show', 'warning');
-    msgText.textContent = 'Your session has expired. Please sign in again.';
+    if (cls) msgEl.classList.add(cls);
+    msgText.textContent = txt;
+  }
+
+  /* ── Redirect if already logged in (Supabase session) ───── */
+  const existing = await Auth.getSessionAsync();
+  if (existing) {
+    const profile = await Auth.fetchProfile();
+    if (profile) {
+      const rolePages = { admin: 'admin.html', hr: 'hr.html', accounts: 'accounts.html', user: 'user.html' };
+      window.location.href = rolePages[profile.role] || 'dashboard.html';
+      return;
+    }
   }
 
   /* ── Pre-fill remembered username ───────────────────────── */
@@ -596,17 +603,6 @@
     document.getElementById('remember-me').checked = true;
     document.getElementById('password').focus();
   }
-
-  /* ── Redirect if already logged in ─────────────────────── */
-  if (Auth.isLoggedIn()) {
-    const sess = Auth.getCurrentUser();
-    const rolePages = { admin: 'admin.html', hr: 'hr.html', accounts: 'accounts.html', user: 'user.html' };
-    window.location.href = rolePages[sess?.role] || 'dashboard.html';
-    return;
-  }
-
-  /* ── Ensure default admin exists ────────────────────────── */
-  await ensureDefaultAdmin();
 
   /* ── Password toggle ────────────────────────────────────── */
   document.getElementById('toggle-password').addEventListener('click', () => {
@@ -626,12 +622,10 @@
     e.preventDefault();
     App.Modal.create({
       title: 'Forgot Password',
-      body: `
-        <p style="color:var(--text-secondary);line-height:1.7;">
-          Please contact your <strong>System Administrator</strong> to reset your password.<br><br>
-          Your administrator can reset passwords from the
-          <strong>Admin → Manage Users</strong> section.
-        </p>`
+      body: `<p style="color:var(--text-secondary);line-height:1.7;">
+        Please contact your <strong>System Administrator</strong> to reset your password.<br><br>
+        Your administrator can reset passwords from the
+        <strong>Admin → Manage Users</strong> section.</p>`
     });
   });
 
@@ -643,80 +637,27 @@
     const remember = document.getElementById('remember-me').checked;
 
     clearErrors();
-    let valid = true;
-
-    if (!username) { showFieldError('username'); valid = false; }
-    if (!password) { showFieldError('password'); valid = false; }
-    if (!valid) return;
+    if (!username) { showFieldError('username'); return; }
+    if (!password) { showFieldError('password'); return; }
 
     setLoading(true);
-
     try {
-      const user = await authenticate(username, password);
-      if (!user) {
-        showLoginError('Invalid username or password. Please try again.');
-        document.getElementById('login-form').classList.add('shake');
-        setTimeout(() => document.getElementById('login-form').classList.remove('shake'), 450);
-        await Audit.log({ module: 'Auth', action: 'Login', status: 'error', detail: `Failed login for: ${username}` });
-        return;
-      }
-
-      if (user.status !== 'active') {
-        showLoginError('Your account has been disabled. Contact your administrator.');
-        return;
-      }
-
-      Auth.saveSession(user, remember);
-      await Audit.log({ module: 'Auth', action: 'Login', status: 'success', detail: `Logged in as ${user.role}` });
+      const profile = await Auth.login(username, password, remember);
+      await Audit.log({ module: 'Auth', action: 'Login', status: 'success', detail: `Logged in as ${profile.role}` });
 
       const rolePages = { admin: 'admin.html', hr: 'hr.html', accounts: 'accounts.html', user: 'user.html' };
-      const dest = rolePages[user.role] || 'dashboard.html';
-
-      // Brief delay for UX
-      await Utils.sleep(400);
-      window.location.href = dest;
+      await Utils.sleep(300);
+      window.location.href = rolePages[profile.role] || 'dashboard.html';
 
     } catch (err) {
-      console.error('[Login] Error:', err);
-      showLoginError('An error occurred. Please try again.');
+      showLoginError(err.message || 'Invalid username or password.');
+      document.getElementById('login-form').classList.add('shake');
+      setTimeout(() => document.getElementById('login-form').classList.remove('shake'), 450);
+      try { await Audit.log({ module: 'Auth', action: 'Login', status: 'error', detail: `Failed: ${username}` }); } catch {}
     } finally {
       setLoading(false);
     }
   });
-
-  /* ── Helper: authenticate user ──────────────────────────── */
-  async function authenticate(username, password) {
-    const users = await Database.getAll('users');
-    const user  = users.find(u => u.username.toLowerCase() === username.toLowerCase());
-    if (!user) return null;
-
-    const hashed = CryptoJS.SHA256(password + user.salt).toString();
-    if (hashed !== user.passwordHash) return null;
-    return user;
-  }
-
-  /* ── Helper: create default admin if no users ───────────── */
-  async function ensureDefaultAdmin() {
-    const count = await Database.count('users');
-    if (count > 0) return;
-
-    const salt = Utils.uuid();
-    const adminUser = {
-      id:           Utils.uuid(),
-      username:     'admin',
-      displayName:  'System Administrator',
-      role:         'admin',
-      department:   'IT',
-      email:        '',
-      status:       'active',
-      salt,
-      passwordHash: CryptoJS.SHA256('Admin@1234' + salt).toString(),
-      createdAt:    new Date().toISOString(),
-      createdBy:    'system'
-    };
-    await Database.add('users', adminUser);
-    console.info('[Login] Default admin created. Username: admin, Password: Admin@1234');
-  }
 
   /* ── UI helpers ─────────────────────────────────────────── */
   function setLoading(on) {
@@ -726,23 +667,19 @@
   }
 
   function clearErrors() {
-    document.querySelectorAll('.form-control').forEach(el => {
-      el.classList.remove('is-invalid');
-    });
+    document.querySelectorAll('.form-control').forEach(el => el.classList.remove('is-invalid'));
     document.querySelectorAll('.form-error').forEach(el => el.style.display = 'none');
-    const errEl = document.getElementById('login-error');
-    errEl.style.display = 'none';
+    document.getElementById('login-error').style.display = 'none';
   }
 
   function showFieldError(field) {
-    const input = document.getElementById(field);
+    document.getElementById(field)?.classList.add('is-invalid');
     const errEl = document.getElementById(`${field}-error`);
-    input?.classList.add('is-invalid');
     if (errEl) errEl.style.display = 'block';
   }
 
   function showLoginError(msg) {
-    const errEl   = document.getElementById('login-error');
+    const errEl = document.getElementById('login-error');
     const errText = document.getElementById('login-error-text');
     if (errText) errText.textContent = msg;
     if (errEl)   errEl.style.display = 'flex';

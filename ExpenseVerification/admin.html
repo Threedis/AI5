@@ -414,6 +414,8 @@
 
 <!-- ── Scripts ──────────────────────────────────────────────── -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/supabase-client.js"></script>
 <script src="js/utils.js"></script>
 <script src="js/database.js"></script>
 <script src="js/auth.js"></script>
@@ -424,7 +426,7 @@
 
 <script>
 (async () => {
-  if (!Auth.requireAuth(['admin'])) return;
+  if (!await Auth.requireAuth(['admin'])) return;
   const sess = Auth.getCurrentUser();
   await App.init();
 
