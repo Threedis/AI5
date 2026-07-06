@@ -353,17 +353,24 @@ const ZohoProjects = (() => {
         const tmp = document.createElement('div');
         tmp.innerHTML = raw;
         const plain = tmp.textContent || tmp.innerText || raw;
-        // Zoho comment author: prefer display_name, then name, then email prefix, never a raw id
+        // Zoho comment author: skip pure-numeric values (user IDs), prefer human names
         const addedBy = c.added_by || {};
-        const authorName = addedBy.display_name
-          || addedBy.name
+        const nonNumeric = v => {
+          const s = String(v || '').trim();
+          return s && isNaN(s) ? s : '';
+        };
+        const authorName = nonNumeric(addedBy.display_name)
+          || nonNumeric(addedBy.name)
+          || nonNumeric(addedBy.full_name)
           || (addedBy.email ? addedBy.email.split('@')[0] : '')
-          || (typeof addedBy === 'string' && isNaN(addedBy) ? addedBy : '')
+          || (typeof addedBy === 'string' ? nonNumeric(addedBy) : '')
           || '';
+        // Strip Zoho @mention syntax: [@zpuser#12345# ,zp or @zpuser#12345#
+        const cleanContent = plain.trim().replace(/\[?@zpuser#\d+#[^\]]*\]?/g, '').trim();
         return {
           author:    authorName,
           authorId:  addedBy.id || addedBy.zpuid || '',
-          content:   plain.trim(),
+          content:   cleanContent,
           createdAt: c.time_long || c.added_time_string || '',
         };
       });
