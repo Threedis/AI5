@@ -459,7 +459,12 @@
      USERS
   ════════════════════════════════════════════════════════ */
   async function loadUsers(filter = '') {
-    const users      = await Database.getAll('users');
+    let users;
+    try { users = await Database.getAll('users'); }
+    catch(err) {
+      document.getElementById('users-tbody').innerHTML = `<tr><td colspan="7" style="color:var(--accent-red);padding:20px">Error loading users: ${Utils.escapeHtml(err.message)}</td></tr>`;
+      return;
+    }
     const roleFilter = document.getElementById('role-filter').value;
     const q          = filter.toLowerCase();
 
