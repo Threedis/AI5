@@ -7,7 +7,7 @@ const Database = (() => {
 
   /* ── Table name map (store name → Supabase table) ─────── */
   const TABLE = {
-    users:           'users',
+    users:           'profiles',
     hrMaster:        'hr_master',
     accountsMaster:  'accounts_master',
     auditLogs:       'audit_logs',
