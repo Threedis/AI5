@@ -37,7 +37,8 @@ const Auth = (() => {
       .eq('username', username.trim())
       .maybeSingle();
 
-    if (profErr || !prof) throw new Error('User not found.');
+    if (profErr) throw new Error('Profile lookup failed: ' + profErr.message);
+    if (!prof)   throw new Error('User not found. Check username spelling or contact admin.');
 
     const { data, error } = await sb().auth.signInWithPassword({
       email:    prof.email,
