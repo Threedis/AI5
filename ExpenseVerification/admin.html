@@ -591,6 +591,10 @@
 
       if (!username)                       { App.Toast.error('Validation','Username required.'); return; }
       if (!isEdit && !email)               { App.Toast.error('Validation','Email required.'); return; }
+      if (!isEdit && !Utils.isValidEmail(email)) {
+        App.Toast.error('Validation','Enter a real, routable email address — domains like .local, .test or .example are rejected by the auth provider.');
+        return;
+      }
       if (!isEdit && !password)            { App.Toast.error('Validation','Password required.'); return; }
       if (!isEdit && password.length < 8)  { App.Toast.error('Validation','Password must be ≥ 8 chars.'); return; }
       if (!isEdit) {
