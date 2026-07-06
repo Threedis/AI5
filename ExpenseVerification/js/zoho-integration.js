@@ -164,6 +164,13 @@ const ZohoProjects = (() => {
       ...(task.custom_fields || []).map(cf => String(cf.value || '')),
     ].join(' ');
 
+    const ids = new Set();
+
+    // Context-aware: "Emp ID- RHQ-047", "Employee No: 1234", "Emp Code - ABC01"
+    for (const m of text.matchAll(/emp(?:loyee)?\s*(?:id|no|code)[.\-:\s]+([A-Z0-9][A-Z0-9\-\/]{2,15})/gi)) {
+      ids.add(m[1].trim().toUpperCase());
+    }
+
     const patterns = [
       /\bEMP[-_/]?\d{3,8}\b/gi,
       /\bE[-_]?\d{4,8}\b/gi,
@@ -171,11 +178,52 @@ const ZohoProjects = (() => {
       /\bP[-_]?\d{4,8}\b/gi,
       /\b\d{4,8}\/\d{2,4}\b/g,
     ];
-    const ids = new Set();
     for (const pat of patterns) {
       for (const m of text.matchAll(new RegExp(pat.source, pat.flags))) ids.add(m[0].toUpperCase());
     }
     return [...ids];
+  }
+
+  /* ── Extract emp IDs / name / amount from comment text ───── */
+  function extractFromComments(comments) {
+    const ids = new Set();
+    let empName = '';
+    let amount  = 0;
+
+    for (const c of comments) {
+      const text = c.content || '';
+
+      // Context-aware: "Emp ID- RHQ-047", "Employee No: EMP001"
+      for (const m of text.matchAll(/emp(?:loyee)?\s*(?:id|no|code)[.\-:\s]+([A-Z0-9][A-Z0-9\-\/]{2,15})/gi)) {
+        ids.add(m[1].trim().toUpperCase());
+      }
+
+      // Generic "LETTERS-digits" format (e.g. RHQ-047) only when "emp" is nearby
+      for (const m of text.matchAll(/\b([A-Z]{2,6}-\d{2,6})\b/gi)) {
+        const before = text.slice(Math.max(0, m.index - 30), m.index).toLowerCase();
+        if (/emp/i.test(before)) ids.add(m[1].toUpperCase());
+      }
+
+      // Employee name: "Emp Name- Ramniwash ..."
+      if (!empName) {
+        const nm = text.match(/emp(?:loyee)?\s*name[.\-:\s]+([A-Za-z][A-Za-z\s]{1,40}?)(?:\s{2,}|[-–]\s*\d|\s+(?:tour|advance|salary|pay)\b|$)/i);
+        if (nm) empName = nm[1].trim();
+      }
+
+      // Amount: look for leading "-15000" or "Amount: 15000" or plain number after context
+      const amtPatterns = [
+        /(?:amount|advance|pay|salary|total)[.\-:\s]+(?:rs\.?|inr|₹)?\s*([\d,]+(?:\.\d{1,2})?)/gi,
+        /[-–]\s*([\d,]{4,}(?:\.\d{1,2})?)\b/g,
+      ];
+      for (const pat of amtPatterns) {
+        for (const m of text.matchAll(pat)) {
+          const n = parseFloat(m[1].replace(/,/g, ''));
+          if (!isNaN(n) && n > amount) amount = n;
+        }
+      }
+    }
+
+    return { ids: [...ids], empName, amount };
   }
 
   /* ── Parse a raw Zoho task object into our approval shape ── */
@@ -356,6 +404,18 @@ const ZohoProjects = (() => {
 
     parsed.comments    = comments;
     parsed.attachments = attachments.map(a => ({ ...a, kind: classifyAttachment(a) }));
+
+    // Merge emp IDs, name, and amounts found in comments
+    const commentData = extractFromComments(comments);
+    for (const id of commentData.ids) {
+      if (!parsed.empIds.includes(id)) parsed.empIds.push(id);
+    }
+    if (!parsed.zohoEmpName && commentData.empName) parsed.zohoEmpName = commentData.empName;
+    if (commentData.amount > 0) {
+      parsed.empIds.forEach(id => {
+        if (!parsed.zohoAmounts[id.toUpperCase()]) parsed.zohoAmounts[id.toUpperCase()] = commentData.amount;
+      });
+    }
 
     // If task status alone is not conclusive, check comments for approval signals
     const commentApproval = deriveCommentApproval(comments);
