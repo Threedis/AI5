@@ -156,31 +156,124 @@
   <!-- ── Right Hero Panel ─────────────────────────────────── -->
   <div class="login-hero" aria-hidden="true">
     <div class="hero-content">
-      <div class="hero-icon">
-        <i class="fa-solid fa-shield-check"></i>
+
+      <!-- Headline -->
+      <div style="margin-bottom:20px">
+        <h2 style="font-size:1.6rem;margin-bottom:6px">Secure Expense Verification</h2>
+        <p style="opacity:.8;font-size:.9rem;line-height:1.6">
+          Verify employee bank details before releasing expense,
+          reimbursement and payments with full audit trail.
+        </p>
       </div>
-      <h2>Secure Bank Verification</h2>
-      <p>
-        Verify employee bank details before releasing salary,
-        reimbursement and expense payments with full audit trail.
-      </p>
+
+      <!-- Role flow tabs -->
+      <div style="display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:20px;flex-wrap:wrap">
+        <div style="background:rgba(255,255,255,.25);border:1.5px solid rgba(255,255,255,.5);border-radius:8px;padding:5px 13px;font-size:.78rem;font-weight:700;display:flex;align-items:center;gap:5px">
+          <i class="fa-solid fa-user" style="color:#7EC8F7"></i> User
+        </div>
+        <i class="fa-solid fa-chevron-right" style="opacity:.4;font-size:.7rem"></i>
+        <div style="background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);border-radius:8px;padding:5px 13px;font-size:.78rem;font-weight:700;display:flex;align-items:center;gap:5px">
+          <i class="fa-solid fa-users" style="color:#A8E6A0"></i> HR
+        </div>
+        <i class="fa-solid fa-chevron-right" style="opacity:.4;font-size:.7rem"></i>
+        <div style="background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);border-radius:8px;padding:5px 13px;font-size:.78rem;font-weight:700;display:flex;align-items:center;gap:5px">
+          <i class="fa-solid fa-Indian-rupee-sign" style="color:#F7DC6F"></i> Accounts
+        </div>
+        <i class="fa-solid fa-chevron-right" style="opacity:.4;font-size:.7rem"></i>
+        <div style="background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);border-radius:8px;padding:5px 13px;font-size:.78rem;font-weight:700;display:flex;align-items:center;gap:5px">
+          <i class="fa-solid fa-gear" style="color:#F1948A"></i> Admin
+        </div>
+      </div>
+
+      <!-- Verification engine diagram -->
+      <div style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);border-radius:16px;padding:18px;margin-bottom:18px">
+
+        <!-- Top: Cloud databases -->
+        <div style="text-align:center;margin-bottom:14px">
+          <div style="display:inline-flex;align-items:center;gap:8px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);border-radius:10px;padding:8px 18px">
+            <i class="fa-solid fa-cloud" style="font-size:1.3rem;color:#7EC8F7"></i>
+            <div style="text-align:left">
+              <div style="font-size:.65rem;font-weight:700;opacity:.6;letter-spacing:.05em">AES-256 ENCRYPTED</div>
+              <div style="font-size:.8rem;font-weight:700">Secure Cloud Databases</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Main 3-column layout -->
+        <div style="display:grid;grid-template-columns:1fr 90px 1fr;gap:10px;align-items:center">
+
+          <!-- Left: Source databases -->
+          <div style="display:flex;flex-direction:column;gap:7px">
+            <div style="background:rgba(126,200,247,.15);border:1px solid rgba(126,200,247,.35);border-radius:8px;padding:8px 10px;display:flex;align-items:center;gap:7px">
+              <i class="fa-solid fa-database" style="color:#7EC8F7;font-size:1rem;flex-shrink:0"></i>
+              <div>
+                <div style="font-size:.63rem;font-weight:700;opacity:.65;letter-spacing:.04em">HR SARAL</div>
+                <div style="font-size:.75rem;font-weight:600">Payroll Database</div>
+              </div>
+            </div>
+            <div style="background:rgba(168,230,160,.15);border:1px solid rgba(168,230,160,.35);border-radius:8px;padding:8px 10px;display:flex;align-items:center;gap:7px">
+              <i class="fa-solid fa-database" style="color:#A8E6A0;font-size:1rem;flex-shrink:0"></i>
+              <div>
+                <div style="font-size:.63rem;font-weight:700;opacity:.65;letter-spacing:.04em">ACCOUNTS</div>
+                <div style="font-size:.75rem;font-weight:600">Bank Advice DB</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Center: AI Verification Engine -->
+          <div style="text-align:center;display:flex;flex-direction:column;align-items:center;gap:4px">
+            <div style="width:72px;height:72px;background:linear-gradient(135deg,#1a5276,#0078D4);border:2px solid rgba(255,255,255,.35);border-radius:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;box-shadow:0 0 24px rgba(0,120,212,.6)">
+              <i class="fa-solid fa-microchip" style="font-size:1.5rem;margin-bottom:2px"></i>
+              <div style="font-size:.55rem;font-weight:800;letter-spacing:.05em;line-height:1.2;text-align:center">AI VERIFY<br>ENGINE</div>
+            </div>
+            <div style="font-size:.62rem;opacity:.6">Encrypted</div>
+          </div>
+
+          <!-- Right: Output files -->
+          <div style="display:flex;flex-direction:column;gap:7px">
+            <div style="background:rgba(76,175,80,.2);border:1px solid rgba(76,175,80,.4);border-radius:8px;padding:8px 10px;display:flex;align-items:center;justify-content:flex-end;gap:7px">
+              <div style="text-align:right">
+                <div style="font-size:.63rem;font-weight:700;opacity:.65;letter-spacing:.04em">SAL TYPE</div>
+                <div style="font-size:.75rem;font-weight:600">SAL Bank File</div>
+              </div>
+              <i class="fa-solid fa-file-lines" style="color:#A8E6A0;font-size:1rem;flex-shrink:0"></i>
+            </div>
+            <div style="background:rgba(126,200,247,.2);border:1px solid rgba(126,200,247,.4);border-radius:8px;padding:8px 10px;display:flex;align-items:center;justify-content:flex-end;gap:7px">
+              <div style="text-align:right">
+                <div style="font-size:.63rem;font-weight:700;opacity:.65;letter-spacing:.04em">NAS TYPE</div>
+                <div style="font-size:.75rem;font-weight:600">NAS Bank File</div>
+              </div>
+              <i class="fa-solid fa-file-lines" style="color:#7EC8F7;font-size:1rem;flex-shrink:0"></i>
+            </div>
+          </div>
+        </div>
+
+        <!-- Zoho Task ID search bar mockup -->
+        <div style="background:rgba(255,255,255,.1);border-radius:8px;padding:7px 10px;margin-top:12px;display:flex;align-items:center;gap:8px">
+          <i class="fa-solid fa-link" style="color:#7EC8F7;flex-shrink:0;font-size:.85rem"></i>
+          <div style="flex:1;background:rgba(255,255,255,.12);border-radius:5px;padding:4px 9px;font-size:.74rem;opacity:.65;text-align:left;font-family:monospace">ZOHO-12345</div>
+          <div style="background:#27AE60;border-radius:5px;padding:3px 11px;font-size:.72rem;font-weight:700;display:flex;align-items:center;gap:4px;white-space:nowrap">
+            <i class="fa-solid fa-magnifying-glass"></i> Search
+          </div>
+        </div>
+
+        <!-- Result badge -->
+        <div style="margin-top:9px;display:flex;align-items:center;gap:8px;justify-content:center">
+          <div style="display:flex;align-items:center;gap:5px;background:rgba(76,175,80,.2);border:1px solid rgba(76,175,80,.4);border-radius:99px;padding:3px 12px;font-size:.74rem;font-weight:700">
+            <i class="fa-solid fa-circle-check" style="color:#A8E6A0"></i> Identity Verified
+          </div>
+          <div style="display:flex;align-items:center;gap:5px;background:rgba(126,200,247,.2);border:1px solid rgba(126,200,247,.4);border-radius:99px;padding:3px 12px;font-size:.74rem;font-weight:700">
+            <i class="fa-solid fa-circle-check" style="color:#7EC8F7"></i> Payment Approved
+          </div>
+        </div>
+      </div>
+
+      <!-- Feature chips -->
       <div class="hero-features">
-        <div class="hero-feature">
-          <i class="fa-solid fa-lock"></i>
-          AES-256 encrypted local storage
-        </div>
-        <div class="hero-feature">
-          <i class="fa-solid fa-users"></i>
-          Role-based access control
-        </div>
-        <div class="hero-feature">
-          <i class="fa-solid fa-cloud-arrow-up"></i>
-          Encrypted GitHub backup
-        </div>
-        <div class="hero-feature">
-          <i class="fa-solid fa-file-invoice"></i>
-          Automated discrepancy reports
-        </div>
+        <div class="hero-feature"><i class="fa-solid fa-lock"></i> AES-256 Encrypted</div>
+        <div class="hero-feature"><i class="fa-solid fa-users"></i> Multi-Role Access</div>
+        <div class="hero-feature"><i class="fa-solid fa-circle-check"></i> Auto Verification</div>
+        <div class="hero-feature"><i class="fa-solid fa-file-invoice"></i> SAL &amp; NAS Files</div>
       </div>
     </div>
   </div>

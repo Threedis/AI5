@@ -143,27 +143,6 @@
       </div>
     </div>
 
-    <!-- Global search bar -->
-    <div class="card" style="margin-bottom:20px">
-      <div class="card-body" style="padding:14px 16px">
-        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-          <select class="form-control" id="search-field" style="width:160px">
-            <option value="all">All Fields</option>
-            <option value="empId">Employee ID</option>
-            <option value="name">Name</option>
-            <option value="account">Account No</option>
-            <option value="pan">PAN</option>
-            <option value="ifsc">IFSC</option>
-          </select>
-          <div style="flex:1;min-width:200px" class="table-search">
-            <i class="fa-solid fa-magnifying-glass"></i>
-            <input type="text" id="global-emp-search" placeholder="Search HR + Accounts database…" aria-label="Employee search">
-          </div>
-          <button class="btn btn-primary" id="btn-search"><i class="fa-solid fa-magnifying-glass"></i> Search</button>
-          <button class="btn btn-ghost" id="btn-clear-search">Clear</button>
-        </div>
-      </div>
-    </div>
 
     <!-- Main tabs -->
     <div data-tab-group id="main-tabs">
@@ -289,6 +268,9 @@
           <div class="card">
             <div class="card-header">
               <div class="card-title"><i class="fa-solid fa-clipboard-check"></i> Approval Details</div>
+              <button class="btn btn-primary btn-sm" id="btn-verify-zoho-top" style="display:none">
+                <i class="fa-solid fa-shield-check"></i> Verify
+              </button>
             </div>
             <div class="card-body" id="approval-panel">
               <div class="empty-state" style="padding:30px 0">
@@ -308,17 +290,17 @@
               <span class="badge badge-blue" id="pdf-emp-count">0 emp IDs</span>
             </div>
             <div class="table-wrap" style="max-height:320px;overflow-y:auto;overflow-x:auto">
-              <table class="data-table" style="min-width:700px">
-                <thead><tr><th>EMP ID</th><th>NAME</th><th>BANK</th><th>ACCOUNT NO</th><th>AMOUNT</th><th>IFSC</th><th>TYPE</th></tr></thead>
+              <table class="data-table" style="min-width:580px">
+                <thead><tr><th>EMP ID</th><th>NAME</th><th>BANK</th><th>ACCOUNT NO</th><th>AMOUNT</th><th>TYPE</th></tr></thead>
                 <tbody id="pdf-emp-tbody"></tbody>
               </table>
             </div>
-            <div style="padding:12px 16px;border-top:1px solid var(--border);display:flex;gap:10px">
-              <button class="btn btn-primary btn-sm" id="btn-verify-from-pdf">
-                <i class="fa-solid fa-shield-check"></i> Run Verification for These Employees
+            <div style="padding:12px 16px;border-top:1px solid var(--border);display:flex;gap:10px;justify-content:space-between;align-items:center">
+              <button class="btn btn-outline btn-sm" id="btn-verify-from-pdf">
+                <i class="fa-solid fa-play"></i> Run Full Verification
               </button>
-              <button class="btn btn-ghost btn-sm" onclick="document.querySelector('.tab-btn[data-tab=verify]').click()">
-                View Full Results <i class="fa-solid fa-arrow-right"></i>
+              <button class="btn btn-primary btn-sm" id="btn-verify-zoho-bottom" style="display:none">
+                <i class="fa-solid fa-shield-check"></i> Verify
               </button>
             </div>
           </div>
@@ -389,10 +371,54 @@
 
       <!-- ══════ Search Tab ══════════════════════════════════ -->
       <div class="tab-pane" data-tab="search">
+
+        <!-- Search panel (moved from global card) -->
+        <div class="card" style="margin-bottom:16px">
+          <div class="card-body" style="padding:14px 16px">
+            <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+              <select class="form-control" id="search-field" style="width:160px">
+                <option value="all">All Fields</option>
+                <option value="empId">Employee ID</option>
+                <option value="name">Name</option>
+                <option value="account">Account No</option>
+              </select>
+              <div style="flex:1;min-width:200px" class="table-search">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input type="text" id="global-emp-search" placeholder="Search HR + Accounts database…" aria-label="Employee search">
+              </div>
+              <button class="btn btn-primary" id="btn-search"><i class="fa-solid fa-magnifying-glass"></i> Search</button>
+              <button class="btn btn-ghost" id="btn-clear-search">Clear</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Generate Expense panel (shown when all verified emp IDs found in both DBs) -->
+        <div id="generate-expense-section" style="display:none;margin-bottom:16px">
+          <div class="card" style="border:2px solid var(--accent-green);background:rgba(10,95,10,.04)">
+            <div class="card-body" style="padding:14px 16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+              <div style="display:flex;align-items:center;gap:10px">
+                <i class="fa-solid fa-circle-check" style="color:var(--accent-green);font-size:1.4rem"></i>
+                <div>
+                  <div style="font-weight:700;color:var(--accent-green)">All employees verified in both databases</div>
+                  <div style="font-size:.8rem;color:var(--text-muted)">Ready to generate expense payment file</div>
+                </div>
+              </div>
+              <div style="display:flex;gap:10px">
+                <button class="btn btn-sm" id="btn-gen-sal" style="background:#0A5F0A;color:#fff;border:none;gap:6px">
+                  <i class="fa-solid fa-file-arrow-down"></i> SAL File
+                </button>
+                <button class="btn btn-sm" id="btn-gen-nas" style="background:#005A9E;color:#fff;border:none;gap:6px">
+                  <i class="fa-solid fa-file-arrow-down"></i> NAS File
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div id="search-results-area">
           <div id="search-prompt" style="text-align:center;padding:60px 20px;color:var(--text-muted)">
             <i class="fa-solid fa-magnifying-glass" style="font-size:3rem;opacity:.3;margin-bottom:12px"></i>
-            <p>Use the search bar above to find employees across HR and Accounts databases</p>
+            <p>Use the search panel above to find employees across HR and Accounts databases</p>
           </div>
           <div id="search-results-wrap" style="display:none">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px">
@@ -407,9 +433,9 @@
               </div>
             </div>
             <div class="table-wrap" style="overflow-x:auto">
-              <table class="data-table" style="min-width:700px">
+              <table class="data-table" style="min-width:580px">
                 <thead>
-                  <tr><th>Source</th><th>Emp ID</th><th>Name</th><th>Bank</th><th>Account No</th><th>IFSC</th><th>Name in Bank</th><th>PAN</th><th>Net Pay</th></tr>
+                  <tr><th>Source</th><th>Emp ID</th><th>Name</th><th>Bank</th><th>Account No</th><th>Name in Bank</th><th>Net Pay</th></tr>
                 </thead>
                 <tbody id="search-tbody"></tbody>
               </table>
@@ -533,11 +559,13 @@
   ══════════════════════════════════════════════════════════ */
   let pdfFile      = null;
   let pdfParsed    = null;
-  let verifyResults = null; // current results array
+  let verifyResults = null;
   let verifyPage   = 1;
   const PAGE_SIZE  = 50;
   let vFiltered    = [];
   let searchResults = [];
+  let zohoVerifyMode = false; // true when search tab opened via Verify button
+  let verifyEmpIds   = [];    // emp IDs from zoho task pending verification
 
   /* ══════════════════════════════════════════════════════════
      APPROVAL SOURCE MODE TOGGLE
@@ -628,6 +656,7 @@
         document.getElementById('pdf-verify-section').style.display = 'block';
         document.getElementById('pdf-emp-count').textContent = `${zohoTask.empIds.length} emp ID(s)`;
       }
+      showVerifyButtons(zohoTask.empIds.length > 0);
 
       App.Toast.success('Task Found', ZohoProjects.getSummary(zohoTask));
       await Audit.log({ module: 'Zoho', action: 'FetchTask', status: 'success', detail: `Task ${taskId}: ${zohoTask.approvalStatus}` });
@@ -644,6 +673,28 @@
 
   document.getElementById('btn-zoho-search').addEventListener('click', doZohoSearch);
   document.getElementById('zoho-task-id').addEventListener('keydown', e => e.key === 'Enter' && doZohoSearch());
+
+  /* ── Verify button visibility ───────────────────────────── */
+  function showVerifyButtons(show) {
+    ['btn-verify-zoho-top', 'btn-verify-zoho-bottom'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = show ? '' : 'none';
+    });
+  }
+
+  /* ── Verify from Zoho → switch to Search tab, auto-search ── */
+  async function doVerifyFromZoho() {
+    if (!zohoTask || !zohoTask.empIds.length) return;
+    zohoVerifyMode = true;
+    verifyEmpIds   = zohoTask.empIds;
+    document.getElementById('search-field').value      = 'empId';
+    document.getElementById('global-emp-search').value = zohoTask.empIds[0];
+    document.querySelector('.tab-btn[data-tab="search"]').click();
+    await doSearch();
+  }
+
+  document.getElementById('btn-verify-zoho-top').addEventListener('click',    doVerifyFromZoho);
+  document.getElementById('btn-verify-zoho-bottom').addEventListener('click',  doVerifyFromZoho);
 
   /* ══════════════════════════════════════════════════════════
      PDF UPLOAD
@@ -971,13 +1022,12 @@
       const accRec = accMap.get(key);
 
       if (!hrRec || !accRec) {
-        // Missing from one or both — show warning row
         const missing = !hrRec && !accRec ? 'Not in HR or Accounts'
                       : !hrRec ? 'Not in HR database'
                       : 'Not in Accounts database';
         return `<tr style="opacity:.6">
           <td style="font-family:var(--font-mono);font-weight:600">${Utils.escapeHtml(id)}</td>
-          <td colspan="5" style="color:var(--accent-orange);font-size:.8rem"><i class="fa-solid fa-triangle-exclamation"></i> ${missing}</td>
+          <td colspan="4" style="color:var(--accent-orange);font-size:.8rem"><i class="fa-solid fa-triangle-exclamation"></i> ${missing}</td>
           <td><span class="status-badge vs-mismatch">Incomplete</span></td>
         </tr>`;
       }
@@ -986,7 +1036,6 @@
       const name    = hrRec.employeeName || accRec.empName || '—';
       const bank    = accRec.bankName || '—';
       const accNo   = accRec.accountNo || '—';
-      const ifsc    = accRec.ifsc || hrRec.ifsc || '—';
       const amount  = amounts[key] || accRec.netPay || 0;
       const section = (accRec.section || '').toUpperCase();
       const type    = /^NES$|^NPS$|^NAS$/i.test(section) ? 'NAS'
@@ -1000,7 +1049,6 @@
         <td>${Utils.escapeHtml(bank)}</td>
         <td style="font-family:var(--font-mono);font-size:.82rem">${Utils.escapeHtml(accNo)}</td>
         <td style="text-align:right;font-weight:600;color:var(--accent-green)">${Utils.formatCurrency(amount)}</td>
-        <td style="font-family:var(--font-mono);font-size:.82rem">${Utils.escapeHtml(ifsc)}</td>
         <td><span class="fi-badge ${typeCls}">${type}</span></td>
       </tr>`;
     });
@@ -1189,12 +1237,87 @@
       searchResults = await Verification.searchEmployees(term, field);
       renderSearchResults(searchResults);
       document.querySelector('.tab-btn[data-tab="search"]').click();
+      await checkGenerateExpense();
     } catch (e) {
       App.Toast.error('Search Failed', e.message);
     } finally {
       App.Loader.hide();
     }
   }
+
+  /* ── Check if all zoho emp IDs are found in both DBs ───── */
+  async function checkGenerateExpense() {
+    const section = document.getElementById('generate-expense-section');
+    if (!section) return;
+    if (!zohoVerifyMode || !verifyEmpIds.length) { section.style.display = 'none'; return; }
+
+    const hrAll  = await Database.getAll('hrMaster');
+    const accAll = await Database.getAll('accountsMaster');
+    const hrMap  = new Map(hrAll.map(r  => [r.employeeId?.toUpperCase(), r]));
+    const accMap = new Map(accAll.map(r => [r.empCode?.toUpperCase(), r]));
+
+    const allFound = verifyEmpIds.every(id => hrMap.has(id.toUpperCase()) && accMap.has(id.toUpperCase()));
+    section.style.display = allFound ? '' : 'none';
+  }
+
+  /* ── Generate SAL or NAS expense file ──────────────────── */
+  async function generateExpenseFile(forceType) {
+    if (!verifyEmpIds.length) return;
+    App.Loader.show('Generating expense file…');
+    try {
+      const hrAll  = await Database.getAll('hrMaster');
+      const accAll = await Database.getAll('accountsMaster');
+      const hrMap  = new Map(hrAll.map(r  => [r.employeeId?.toUpperCase(), r]));
+      const accMap = new Map(accAll.map(r => [r.empCode?.toUpperCase(), r]));
+      const amounts = zohoTask?.zohoAmounts || {};
+
+      const rows = [];
+      for (const id of verifyEmpIds) {
+        const key = id.toUpperCase();
+        const hr  = hrMap.get(key);
+        const acc = accMap.get(key);
+        if (!hr || !acc) continue;
+        const sec  = (acc.section || '').toUpperCase();
+        const type = /^NES$|^NPS$|^NAS$/i.test(sec) ? 'NAS'
+                   : /^SAL/i.test(sec) ? 'SAL'
+                   : (acc._sheet && /nes|nas|nps/i.test(acc._sheet) ? 'NAS' : 'SAL');
+        if (type !== forceType) continue;
+        rows.push({
+          empId:  id,
+          name:   hr.employeeName || acc.empName || '',
+          bank:   acc.bankName || '',
+          accNo:  acc.accountNo || '',
+          ifsc:   acc.ifsc || hr.ifsc || '',
+          amount: amounts[key] || acc.netPay || 0,
+          type,
+        });
+      }
+
+      if (!rows.length) { App.Toast.warning('No Records', `No ${forceType} type employees found.`); return; }
+
+      const header  = 'Emp ID,Name,Bank,Account No,IFSC,Amount,Type';
+      const csvRows = rows.map(r =>
+        [r.empId, r.name, r.bank, r.accNo, r.ifsc, r.amount, r.type]
+          .map(v => `"${String(v).replace(/"/g, '""')}"`).join(','));
+      const csv  = [header, ...csvRows].join('\r\n');
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url  = URL.createObjectURL(blob);
+      const a    = Object.assign(document.createElement('a'), {
+        href: url,
+        download: `expense_${forceType}_${zohoTask?.taskId || 'export'}_${new Date().toISOString().slice(0,10)}.csv`,
+      });
+      a.click();
+      URL.revokeObjectURL(url);
+      App.Toast.success('Downloaded', `${forceType} expense file — ${rows.length} record(s).`);
+    } catch (err) {
+      App.Toast.error('Failed', err.message);
+    } finally {
+      App.Loader.hide();
+    }
+  }
+
+  document.getElementById('btn-gen-sal').addEventListener('click', () => generateExpenseFile('SAL'));
+  document.getElementById('btn-gen-nas').addEventListener('click', () => generateExpenseFile('NAS'));
 
   function renderSearchResults(results) {
     document.getElementById('search-prompt').style.display       = 'none';
@@ -1215,12 +1338,10 @@
         <td>${Utils.escapeHtml(r.name||'—')}</td>
         <td>${Utils.escapeHtml(r.bank||'—')}</td>
         <td style="font-family:var(--font-mono);font-size:.8rem">${Utils.escapeHtml(r.accountNo||'—')}</td>
-        <td style="font-family:var(--font-mono);font-size:.8rem">${Utils.escapeHtml(r.ifsc||'—')}</td>
         <td>${Utils.escapeHtml(r.nameInBank||'—')}</td>
-        <td style="font-family:var(--font-mono);font-size:.8rem">${Utils.escapeHtml(r.pan||'—')}</td>
         <td style="text-align:right">${r.netPay!=null ? Utils.formatCurrency(r.netPay) : '—'}</td>
       </tr>`).join('') :
-      '<tr><td colspan="9" style="text-align:center;padding:30px;color:var(--text-muted)">No matching records</td></tr>';
+      '<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--text-muted)">No matching records</td></tr>';
   }
 
   document.getElementById('btn-search').addEventListener('click', doSearch);
@@ -1229,7 +1350,10 @@
     document.getElementById('global-emp-search').value = '';
     document.getElementById('search-prompt').style.display       = '';
     document.getElementById('search-results-wrap').style.display = 'none';
-    searchResults = [];
+    document.getElementById('generate-expense-section').style.display = 'none';
+    searchResults  = [];
+    zohoVerifyMode = false;
+    verifyEmpIds   = [];
   });
   document.getElementById('search-hr-only').addEventListener('change',  () => renderSearchResults(searchResults));
   document.getElementById('search-acc-only').addEventListener('change', () => renderSearchResults(searchResults));
