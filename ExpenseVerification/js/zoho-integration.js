@@ -129,6 +129,33 @@ const ZohoProjects = (() => {
     return [...names];
   }
 
+  /* ── Extract employee name from task text ────────────────── */
+  function extractEmpName(task) {
+    const text = [task.name || '', task.description || ''].join('\n');
+    const m = text.match(/(?:emp(?:loyee)?\s*name|name)\s*[:\-]\s*([A-Za-z][A-Za-z\s]{2,40})/i);
+    return m ? m[1].trim() : '';
+  }
+
+  /* ── Extract amount from task text / custom fields ───────── */
+  function extractAmount(task) {
+    // Check custom fields first
+    for (const cf of (task.custom_fields || [])) {
+      const label = (cf.column_name || cf.label_name || '').toLowerCase();
+      if (/amount|net\s*pay|salary|total/i.test(label) && cf.value) {
+        const n = parseFloat(String(cf.value).replace(/[^0-9.]/g, ''));
+        if (!isNaN(n) && n > 0) return n;
+      }
+    }
+    // Parse from description / task name
+    const text = [task.name || '', task.description || ''].join('\n');
+    const m = text.match(/(?:amount|net\s*pay|salary|total)\s*[:\-\s]?\s*(?:rs\.?|inr|₹)?\s*([\d,]+(?:\.\d{1,2})?)/i);
+    if (m) {
+      const n = parseFloat(m[1].replace(/,/g, ''));
+      if (!isNaN(n) && n > 0) return n;
+    }
+    return 0;
+  }
+
   /* ── Extract employee IDs from task text ─────────────────── */
   function extractEmpIds(task) {
     const text = [
@@ -159,6 +186,11 @@ const ZohoProjects = (() => {
     const empIds    = extractEmpIds(task);
     const approvers = extractApprovers(task);
     const summaryProvider = task.created_by?.display_name || task.created_by || '';
+    const taskAmount  = extractAmount(task);
+    const taskEmpName = extractEmpName(task);
+    // Build a per-empId amount map (same amount for all IDs if only one amount found)
+    const zohoAmounts = {};
+    if (taskAmount > 0) empIds.forEach(id => { zohoAmounts[id.toUpperCase()] = taskAmount; });
 
     const customMap = {};
     (task.custom_fields || []).forEach(cf => {
@@ -177,6 +209,8 @@ const ZohoProjects = (() => {
       summaryProvider,
       approvers,
       empIds,
+      zohoAmounts,
+      zohoEmpName:    taskEmpName,
       assignees:      (task.details?.owners || []).map(o => o.display_name || '').filter(Boolean),
       description:    task.description || '',
       createdAt:      task.created_time_string || task.created_time || '',
