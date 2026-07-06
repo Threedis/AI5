@@ -44,7 +44,7 @@ const Auth = (() => {
       email:    prof.email,
       password: password,
     });
-    if (error) throw new Error('Invalid username or password.');
+    if (error) throw new Error('Auth error: ' + error.message + ' [' + error.status + ']');
 
     _profile = { ...prof, id: data.user.id };
 
