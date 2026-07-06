@@ -1,0 +1,956 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Accounts — Employee Expense Verification</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="css/theme.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/styles.css">
+  <style>
+    /* ── Step progress ─────────────────────────────────────── */
+    .step-bar { display:flex; align-items:flex-start; gap:0; margin-bottom:28px; }
+    .step { display:flex; flex-direction:column; align-items:center; flex:1; position:relative; }
+    .step:not(:last-child)::after {
+      content:''; position:absolute; top:16px; left:50%; width:100%; height:2px;
+      background:var(--border); z-index:0; transform:translateX(0);
+    }
+    .step.done::after  { background:var(--accent-green); }
+    .step.active::after{ background:var(--primary-light); }
+    .step-num {
+      width:32px; height:32px; border-radius:50%; border:2px solid var(--border);
+      display:flex; align-items:center; justify-content:center; font-weight:700; font-size:.8rem;
+      background:var(--bg-card); color:var(--text-muted); position:relative; z-index:1;
+      transition:var(--transition);
+    }
+    .step.active .step-num { border-color:var(--primary); background:var(--primary); color:#fff; }
+    .step.done   .step-num { border-color:var(--accent-green); background:var(--accent-green); color:#fff; }
+    .step-label { font-size:.72rem; margin-top:6px; color:var(--text-muted); text-align:center; font-weight:600; white-space:nowrap; }
+    .step.active .step-label { color:var(--primary); }
+    .step.done   .step-label { color:var(--accent-green); }
+
+    /* ── Column detection grid ─────────────────────────────── */
+    .col-map-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:8px; }
+    .col-map-item {
+      display:flex; align-items:center; gap:8px; padding:8px 12px;
+      border-radius:var(--radius-sm); font-size:.8rem; border:1px solid var(--border);
+    }
+    .col-map-item.found    { background:#f0faf0; border-color:#c3e6cb; }
+    .col-map-item.missing  { background:#fff8f0; border-color:#ffd8a8; }
+    .col-map-item.req-missing { background:#fef0f0; border-color:#f5c6cb; }
+    .col-map-item .ci { width:18px; height:18px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0; font-size:.65rem; }
+    .col-map-item.found    .ci { background:var(--accent-green); color:#fff; }
+    .col-map-item.missing  .ci { background:var(--accent-yellow); color:#fff; }
+    .col-map-item.req-missing .ci { background:var(--accent-red); color:#fff; }
+
+    /* ── Summary cards ──────────────────────────────────────── */
+    .vsum-cards { display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:12px; margin-bottom:16px; }
+    .vsum-card { border-radius:var(--radius-sm); padding:14px 16px; text-align:center; }
+    .vsum-card .vc-num { font-size:2rem; font-weight:700; line-height:1; }
+    .vsum-card .vc-lbl { font-size:.75rem; font-weight:600; margin-top:4px; text-transform:uppercase; letter-spacing:.04em; }
+    .vsum-total  { background:#EFF6FC; border:1px solid #C7E0F4; }
+    .vsum-valid  { background:#DFF6DD; border:1px solid #B3D9B3; }
+    .vsum-error  { background:#FDE7E9; border:1px solid #F5C6CB; }
+    .vsum-warn   { background:#FFF4CE; border:1px solid #FFD97E; }
+    .vsum-total .vc-num  { color:var(--primary); }
+    .vsum-valid .vc-num  { color:var(--accent-green); }
+    .vsum-error .vc-num  { color:var(--accent-red); }
+    .vsum-warn  .vc-num  { color:#8A6200; }
+
+    /* ── File list item ─────────────────────────────────────── */
+    .file-item {
+      display:flex; align-items:center; gap:12px; padding:10px 14px;
+      background:var(--bg); border-radius:var(--radius-sm); border:1px solid var(--border);
+    }
+    .file-item .fi-info { flex:1; min-width:0; }
+    .file-item .fi-name { font-weight:600; font-size:.875rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .file-item .fi-meta { font-size:.75rem; color:var(--text-muted); }
+    .file-item .fi-badge { font-size:.7rem; padding:2px 8px; border-radius:var(--radius-pill); font-weight:700; }
+    .badge-sal { background:#EFF6FC; color:#005A9E; border:1px solid #C7E0F4; }
+    .badge-nes { background:#F0F9F0; color:#0A5F0A; border:1px solid #B3D9B3; }
+
+    /* ── Required columns legend ───────────────────────────── */
+    .req-legend { display:flex; gap:16px; flex-wrap:wrap; font-size:.75rem; margin-top:12px; }
+    .req-legend span { display:flex; align-items:center; gap:5px; }
+    .req-dot { width:10px; height:10px; border-radius:50%; }
+
+    /* ── Batch card in history table ───────────────────────── */
+    .batch-badge { font-size:.7rem; padding:2px 8px; border-radius:var(--radius-pill); font-weight:700; }
+    .batch-active   { background:#DFF6DD; color:#0A5F0A; border:1px solid #B3D9B3; }
+    .batch-archived { background:var(--bg); color:var(--text-muted); border:1px solid var(--border); }
+
+    /* ── Preview table pagination ───────────────────────────── */
+    .pagination { display:flex; align-items:center; gap:6px; justify-content:center; padding:12px 0; flex-wrap:wrap; }
+    .page-btn { min-width:32px; height:32px; border-radius:var(--radius-sm); border:1px solid var(--border); background:var(--bg-card); color:var(--text-primary); font-size:.8rem; cursor:pointer; transition:var(--transition); display:flex; align-items:center; justify-content:center; }
+    .page-btn:hover  { background:var(--bg-hover); border-color:var(--primary); }
+    .page-btn.active { background:var(--primary); color:#fff; border-color:var(--primary); }
+    .page-info { font-size:.8rem; color:var(--text-muted); padding:0 8px; }
+  </style>
+</head>
+<body>
+
+<!-- ── Header ──────────────────────────────────────────────── -->
+<header class="app-header">
+  <button class="sidebar-toggle-btn" aria-label="Toggle sidebar"><i class="fa-solid fa-bars"></i></button>
+  <div class="brand">
+    <div class="brand-icon"><i class="fa-solid fa-shield-check"></i></div>
+    <span>ExpenseVerify</span><span class="version-chip">v1.0</span>
+  </div>
+  <div class="header-search">
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <input type="text" id="global-search-input" placeholder="Search employees…" aria-label="Global search">
+  </div>
+  <div class="header-actions">
+    <button class="header-btn" aria-label="Notifications"><i class="fa-regular fa-bell"></i></button>
+    <div class="dropdown">
+      <div class="user-avatar" id="user-avatar" data-dropdown="user-menu" aria-label="User menu">AC</div>
+      <div class="dropdown-menu" id="user-menu">
+        <button class="dropdown-item" onclick="location.href='dashboard.html'"><i class="fa-solid fa-chart-pie"></i> Dashboard</button>
+        <div class="dropdown-divider"></div>
+        <button class="dropdown-item danger" data-action="logout"><i class="fa-solid fa-right-from-bracket"></i> Sign Out</button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ── Sidebar ─────────────────────────────────────────────── -->
+<aside class="app-sidebar" id="app-sidebar">
+  <nav class="sidebar-nav">
+    <div class="nav-section-label">Main</div>
+    <button class="nav-item" data-page="dashboard.html"><span class="nav-icon"><i class="fa-solid fa-chart-pie"></i></span><span class="nav-label">Dashboard</span></button>
+
+    <div class="nav-section-label">Accounts</div>
+    <button class="nav-item" data-page="accounts.html"><span class="nav-icon"><i class="fa-solid fa-file-invoice-dollar"></i></span><span class="nav-label">Bank Advice Upload</span></button>
+    <button class="nav-item" data-page="accounts.html" data-tab="records"><span class="nav-icon"><i class="fa-solid fa-table"></i></span><span class="nav-label">View Records</span></button>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="sidebar-user">
+      <div class="s-avatar" id="sidebar-avatar">AC</div>
+      <div class="s-info">
+        <div class="s-name" id="sidebar-name">Accounts User</div>
+        <div class="s-role" id="sidebar-role">Accounts</div>
+      </div>
+    </div>
+  </div>
+</aside>
+<div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+<!-- ── Main ────────────────────────────────────────────────── -->
+<main class="app-main">
+  <div class="breadcrumb-bar" id="breadcrumb-bar">
+    <span class="bc-item"><i class="fa-solid fa-house"></i> Home</span>
+    <span class="bc-sep"><i class="fa-solid fa-chevron-right"></i></span>
+    <span class="bc-item"><a href="dashboard.html">Dashboard</a></span>
+    <span class="bc-sep"><i class="fa-solid fa-chevron-right"></i></span>
+    <span class="bc-item active">Accounts — Bank Advice</span>
+  </div>
+
+  <div class="page-content">
+    <div class="page-header">
+      <div>
+        <h1 class="page-title"><i class="fa-solid fa-calculator" style="color:var(--accent-teal)"></i> Bank Advice Upload</h1>
+        <p class="page-subtitle">Upload SAL / NES bank advice files for payment verification</p>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button class="btn btn-outline btn-sm" id="btn-export" disabled>
+          <i class="fa-solid fa-file-arrow-down"></i> Export Active
+        </button>
+      </div>
+    </div>
+
+    <!-- Step Progress -->
+    <div class="step-bar" id="step-bar">
+      <div class="step active" id="step-1">
+        <div class="step-num">1</div>
+        <div class="step-label">Select Files</div>
+      </div>
+      <div class="step" id="step-2">
+        <div class="step-num">2</div>
+        <div class="step-label">Parse & Preview</div>
+      </div>
+      <div class="step" id="step-3">
+        <div class="step-num">3</div>
+        <div class="step-label">Validate</div>
+      </div>
+      <div class="step" id="step-4">
+        <div class="step-num">4</div>
+        <div class="step-label">Save Batch</div>
+      </div>
+    </div>
+
+    <!-- Main Tabs -->
+    <div data-tab-group id="main-tabs">
+      <div class="tabs-nav">
+        <button class="tab-btn active" data-tab="upload"><i class="fa-solid fa-upload"></i> Upload</button>
+        <button class="tab-btn" data-tab="preview"><i class="fa-solid fa-eye"></i> Validation Report <span class="badge badge-blue" id="tab-preview-badge" style="display:none">0</span></button>
+        <button class="tab-btn" data-tab="batches"><i class="fa-solid fa-layer-group"></i> Batch History</button>
+        <button class="tab-btn" data-tab="records"><i class="fa-solid fa-table"></i> View Database</button>
+      </div>
+
+      <!-- ── Upload Tab ───────────────────────────────────────── -->
+      <div class="tab-pane active" data-tab="upload">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title"><i class="fa-solid fa-upload"></i> Upload Bank Advice Files</div>
+            <span class="badge badge-teal">SAL &amp; NES</span>
+          </div>
+          <div class="card-body">
+
+            <!-- Upload zone -->
+            <div class="upload-zone" id="acc-upload-zone" tabindex="0" aria-label="Upload zone">
+              <div class="upload-icon"><i class="fa-solid fa-file-excel"></i></div>
+              <h5>Drop one or more Bank Advice Excel files here</h5>
+              <p>Supports .xlsx, .xls — SAL &amp; NES formats, multiple files allowed</p>
+              <button class="btn btn-outline btn-sm" onclick="document.getElementById('acc-file-input').click()" style="margin-top:12px">
+                <i class="fa-solid fa-folder-open"></i> Browse Files
+              </button>
+              <input type="file" id="acc-file-input" accept=".xlsx,.xls" multiple style="display:none" aria-label="File input">
+            </div>
+
+            <!-- File list -->
+            <div id="acc-file-list" style="margin-top:16px;display:flex;flex-direction:column;gap:8px"></div>
+
+            <!-- Column detection -->
+            <div id="col-map-section" style="display:none;margin-top:20px">
+              <h6 class="section-label">Column Detection</h6>
+              <div class="col-map-grid" id="col-map-grid"></div>
+              <div class="req-legend" style="margin-top:10px">
+                <span><span class="req-dot" style="background:var(--accent-green)"></span> Detected</span>
+                <span><span class="req-dot" style="background:var(--accent-yellow)"></span> Optional / Missing</span>
+                <span><span class="req-dot" style="background:var(--accent-red)"></span> Required / Missing</span>
+              </div>
+            </div>
+
+            <!-- Required columns guide (before parsing) -->
+            <div id="req-cols-guide" style="margin-top:20px">
+              <h6 class="section-label">Required Columns (auto-detected)</h6>
+              <div style="display:flex;flex-wrap:wrap;gap:8px">
+                ${['Account No','IFSC','Emp Name'].map(c => `<span class="badge badge-red">${c} <i class="fa-solid fa-asterisk" style="font-size:.6rem"></i></span>`).join('')}
+                ${['Emp Code','Bank Name','Net Pay','PAN','Name in Bank','Department'].map(c => `<span class="badge badge-teal">${c}</span>`).join('')}
+              </div>
+              <p style="font-size:.75rem;color:var(--text-muted);margin-top:8px"><i class="fa-solid fa-asterisk" style="color:var(--accent-red);font-size:.6rem"></i> Required &nbsp;|&nbsp; Others are optional but recommended</p>
+            </div>
+
+            <!-- Parse progress -->
+            <div id="parse-progress" style="display:none;margin-top:16px">
+              <div class="progress-bar-wrap">
+                <div class="progress-bar-fill" id="parse-progress-fill" style="width:0%"></div>
+              </div>
+              <div class="progress-label" id="parse-progress-label">Parsing files…</div>
+            </div>
+
+            <!-- Actions -->
+            <div style="margin-top:20px;display:flex;gap:10px;flex-wrap:wrap">
+              <button class="btn btn-primary" id="btn-parse" disabled>
+                <i class="fa-solid fa-wand-magic-sparkles"></i> Parse &amp; Preview
+              </button>
+              <button class="btn btn-success" id="btn-save" disabled>
+                <i class="fa-solid fa-database"></i> Encrypt &amp; Save Batch
+              </button>
+              <button class="btn btn-ghost" id="btn-reset">
+                <i class="fa-solid fa-rotate-left"></i> Start Over
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Validation Report Tab ────────────────────────────── -->
+      <div class="tab-pane" data-tab="preview">
+        <div id="preview-empty" style="text-align:center;padding:60px 20px;color:var(--text-muted)">
+          <i class="fa-solid fa-file-magnifying-glass" style="font-size:3rem;opacity:.3;margin-bottom:12px"></i>
+          <p>Parse files first to see the validation report</p>
+        </div>
+
+        <div id="preview-content" style="display:none">
+          <!-- Summary cards -->
+          <div class="vsum-cards">
+            <div class="vsum-card vsum-total"><div class="vc-num" id="vs-total">0</div><div class="vc-lbl">Total Records</div></div>
+            <div class="vsum-card vsum-valid"><div class="vc-num" id="vs-valid">0</div><div class="vc-lbl">Valid</div></div>
+            <div class="vsum-card vsum-error"><div class="vc-num" id="vs-errors">0</div><div class="vc-lbl">Errors</div></div>
+            <div class="vsum-card vsum-warn"><div class="vc-num" id="vs-warnings">0</div><div class="vc-lbl">Warnings</div></div>
+          </div>
+
+          <!-- Status banner -->
+          <div id="val-banner" style="padding:12px 16px;border-radius:var(--radius-sm);margin-bottom:16px;font-weight:600;display:flex;align-items:center;gap:10px"></div>
+
+          <!-- Report actions -->
+          <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap">
+            <button class="btn btn-outline btn-sm" id="btn-dl-report">
+              <i class="fa-solid fa-file-arrow-down"></i> Download Report
+            </button>
+            <button class="btn btn-ghost btn-sm" id="btn-show-errors-only">
+              <i class="fa-solid fa-circle-xmark" style="color:var(--accent-red)"></i> Errors Only
+            </button>
+          </div>
+
+          <!-- Inner tabs -->
+          <div data-tab-group id="report-tabs">
+            <div class="tabs-nav">
+              <button class="tab-btn active" data-tab="r-errors"><i class="fa-solid fa-circle-xmark" style="color:var(--accent-red)"></i> Errors <span class="badge badge-red" id="r-err-count">0</span></button>
+              <button class="tab-btn" data-tab="r-warnings"><i class="fa-solid fa-triangle-exclamation" style="color:var(--accent-yellow)"></i> Warnings <span class="badge badge-yellow" id="r-warn-count">0</span></button>
+              <button class="tab-btn" data-tab="r-all"><i class="fa-solid fa-table"></i> Preview All</button>
+            </div>
+
+            <div class="tab-pane active" data-tab="r-errors">
+              <div class="table-wrap" style="max-height:400px;overflow-y:auto">
+                <table class="data-table">
+                  <thead><tr><th>Row</th><th>Source</th><th>Field</th><th>Type</th><th>Message</th><th>Value</th></tr></thead>
+                  <tbody id="err-tbody"></tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="tab-pane" data-tab="r-warnings">
+              <div class="table-wrap" style="max-height:400px;overflow-y:auto">
+                <table class="data-table">
+                  <thead><tr><th>Row</th><th>Source</th><th>Field</th><th>Type</th><th>Message</th><th>Value</th></tr></thead>
+                  <tbody id="warn-tbody"></tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="tab-pane" data-tab="r-all">
+              <div class="table-toolbar">
+                <div class="table-search">
+                  <i class="fa-solid fa-magnifying-glass"></i>
+                  <input type="text" id="preview-search" placeholder="Filter by name, emp code, account…">
+                </div>
+                <label style="display:flex;align-items:center;gap:6px;font-size:.8rem;cursor:pointer">
+                  <input type="checkbox" id="preview-errors-only"> Errors only
+                </label>
+              </div>
+              <div class="table-wrap" style="max-height:420px;overflow-y:auto">
+                <table class="data-table">
+                  <thead>
+                    <tr><th>#</th><th>Emp Code</th><th>Emp Name</th><th>Bank</th><th>Account No</th><th>Net Pay</th><th>IFSC</th><th>PAN</th><th>Status</th></tr>
+                  </thead>
+                  <tbody id="preview-tbody"></tbody>
+                </table>
+              </div>
+              <div class="pagination" id="preview-pagination"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Batch History Tab ────────────────────────────────── -->
+      <div class="tab-pane" data-tab="batches">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title"><i class="fa-solid fa-layer-group"></i> Batch History</div>
+            <div id="batch-count-info" style="font-size:.78rem;color:var(--text-muted)">Loading…</div>
+          </div>
+          <div class="table-wrap" style="max-height:500px;overflow-y:auto">
+            <table class="data-table">
+              <thead>
+                <tr><th>Batch</th><th>Files</th><th>Records</th><th>Uploaded By</th><th>Date</th><th>Errors</th><th>Status</th><th>Actions</th></tr>
+              </thead>
+              <tbody id="batch-tbody">
+                <tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-muted)">Loading…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── View Database Tab ────────────────────────────────── -->
+      <div class="tab-pane" data-tab="records">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title"><i class="fa-solid fa-database"></i> Active Accounts Database</div>
+            <div id="acc-record-count" style="font-size:.78rem;color:var(--text-muted)">0 records</div>
+          </div>
+          <div class="table-toolbar">
+            <div class="table-search">
+              <i class="fa-solid fa-magnifying-glass"></i>
+              <input type="text" id="acc-view-search" placeholder="Search by name, emp code, account…">
+            </div>
+          </div>
+          <div class="table-wrap" style="max-height:520px;overflow-y:auto">
+            <table class="data-table">
+              <thead>
+                <tr><th>Sl</th><th>Emp Code</th><th>Name</th><th>Bank</th><th>Account No</th><th>Net Pay</th><th>IFSC</th><th>PAN</th><th>Dept</th></tr>
+              </thead>
+              <tbody id="acc-view-tbody">
+                <tr><td colspan="9" style="text-align:center;padding:40px;color:var(--text-muted)">No data loaded yet</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="pagination" id="db-pagination"></div>
+        </div>
+      </div>
+
+    </div><!-- /main tabs -->
+  </div><!-- /page-content -->
+</main>
+
+<!-- ── Scripts ──────────────────────────────────────────────── -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/database.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/audit.js"></script>
+<script src="js/encryption.js"></script>
+<script src="js/app.js"></script>
+<script src="js/accounts.js"></script>
+
+<script>
+(async () => {
+  if (!Auth.requireAuth(['admin', 'accounts'])) return;
+  const sess = Auth.getCurrentUser();
+  await App.init();
+
+  /* ── User info ─────────────────────────────────────────── */
+  const initials = Utils.getInitials(sess.displayName || sess.username);
+  document.getElementById('user-avatar').textContent  = initials;
+  document.getElementById('sidebar-avatar').textContent = initials;
+  document.getElementById('sidebar-name').textContent   = sess.displayName || sess.username;
+  document.getElementById('sidebar-role').textContent   = Auth.ROLES[sess.role]?.label || sess.role;
+
+  App.setBreadcrumb([
+    { label: 'Home', icon: 'fa-house' },
+    { label: 'Dashboard', href: 'dashboard.html' },
+    { label: 'Bank Advice' },
+  ]);
+
+  /* ══════════════════════════════════════════════════════════
+     STATE
+  ══════════════════════════════════════════════════════════ */
+  let selectedFiles  = [];      // File objects
+  let parseResults   = [];      // { fileName, format, records[], sheetResults[] }
+  let allRecords     = [];      // merged records from all files
+  let validation     = null;    // { errors[], warnings[], isValid, total }
+  let previewPage    = 1;
+  const PAGE_SIZE    = 50;
+  let dbPage         = 1;
+  let dbAll          = [];
+  let dbFiltered     = [];
+
+  /* ══════════════════════════════════════════════════════════
+     STEP BAR
+  ══════════════════════════════════════════════════════════ */
+  function setStep(n) {
+    for (let i = 1; i <= 4; i++) {
+      const el = document.getElementById(`step-${i}`);
+      el.classList.remove('active', 'done');
+      if (i < n)       el.classList.add('done'),   el.querySelector('.step-num').innerHTML = '<i class="fa-solid fa-check"></i>';
+      else if (i === n) el.classList.add('active'), el.querySelector('.step-num').textContent = i;
+      else              el.querySelector('.step-num').textContent = i;
+    }
+  }
+
+  /* ══════════════════════════════════════════════════════════
+     FILE SELECTION
+  ══════════════════════════════════════════════════════════ */
+  const zone  = document.getElementById('acc-upload-zone');
+  const input = document.getElementById('acc-file-input');
+
+  zone.addEventListener('click', e => { if (e.target === input) return; input.click(); });
+  zone.addEventListener('keydown',   e => e.key === 'Enter' && input.click());
+  zone.addEventListener('dragover',  e => { e.preventDefault(); zone.classList.add('dragover'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+  zone.addEventListener('drop', e => {
+    e.preventDefault(); zone.classList.remove('dragover');
+    addFiles([...e.dataTransfer.files]);
+  });
+  input.addEventListener('change', e => { addFiles([...e.target.files]); input.value = ''; });
+
+  function addFiles(files) {
+    const valid = files.filter(f => /\.(xlsx|xls)$/i.test(f.name));
+    if (!valid.length) { App.Toast.error('Invalid File', 'Please upload Excel (.xlsx / .xls) files only.'); return; }
+    // Deduplicate by name
+    const existing = new Set(selectedFiles.map(f => f.name));
+    valid.forEach(f => { if (!existing.has(f.name)) { selectedFiles.push(f); existing.add(f.name); } });
+    renderFileList();
+    setStep(1);
+    // Reset parse state when new files added
+    parseResults = []; allRecords = []; validation = null;
+    document.getElementById('btn-save').disabled = true;
+    document.getElementById('col-map-section').style.display = 'none';
+  }
+
+  function renderFileList() {
+    const list = document.getElementById('acc-file-list');
+    if (!selectedFiles.length) { list.innerHTML = ''; document.getElementById('btn-parse').disabled = true; return; }
+
+    list.innerHTML = selectedFiles.map((f, i) => `
+      <div class="file-item">
+        <i class="fa-solid fa-file-excel" style="color:var(--accent-green);font-size:1.2rem;flex-shrink:0"></i>
+        <div class="fi-info">
+          <div class="fi-name">${Utils.escapeHtml(f.name)}</div>
+          <div class="fi-meta">${Utils.formatFileSize(f.size)} &nbsp;·&nbsp; <span class="fi-badge ${/nes|nps|neft/i.test(f.name) ? 'badge-nes' : 'badge-sal'}">${/nes|nps|neft/i.test(f.name) ? 'NES' : 'SAL'}</span></div>
+        </div>
+        <button class="btn btn-ghost btn-sm btn-icon" onclick="removeFile(${i})" title="Remove" aria-label="Remove ${Utils.escapeHtml(f.name)}"><i class="fa-solid fa-xmark"></i></button>
+      </div>`).join('');
+    document.getElementById('btn-parse').disabled = false;
+  }
+
+  window.removeFile = idx => {
+    selectedFiles.splice(idx, 1);
+    renderFileList();
+    if (!selectedFiles.length) {
+      document.getElementById('col-map-section').style.display = 'none';
+      document.getElementById('btn-save').disabled = true;
+    }
+  };
+
+  /* ══════════════════════════════════════════════════════════
+     PARSE FILES
+  ══════════════════════════════════════════════════════════ */
+  document.getElementById('btn-parse').addEventListener('click', async () => {
+    if (!selectedFiles.length) return;
+    setStep(2);
+
+    const prog      = document.getElementById('parse-progress');
+    const fill      = document.getElementById('parse-progress-fill');
+    const label     = document.getElementById('parse-progress-label');
+    prog.style.display = 'block';
+    parseResults = []; allRecords = [];
+
+    try {
+      for (let i = 0; i < selectedFiles.length; i++) {
+        const f = selectedFiles[i];
+        const pct = Math.round(((i) / selectedFiles.length) * 80);
+        fill.style.width  = pct + '%';
+        label.textContent = `Parsing ${f.name}…`;
+
+        const buf = await Utils.readFileAsArrayBuffer(f);
+        const wb  = XLSX.read(buf, { type: 'array' });
+        const res = Accounts.parseWorkbook(wb, f.name);
+        parseResults.push(res);
+        allRecords.push(...res.records);
+      }
+
+      fill.style.width  = '90%';
+      label.textContent = 'Validating…';
+      setStep(3);
+
+      validation = Accounts.validate(allRecords);
+
+      fill.style.width  = '100%';
+      label.textContent = 'Done';
+
+      setTimeout(() => { prog.style.display = 'none'; }, 600);
+
+      // Show column map from first file result
+      renderColumnMap();
+      renderValidationReport();
+      setStep(validation.isValid ? 4 : 3);
+      document.getElementById('btn-save').disabled = !validation.isValid;
+
+      // Switch to report tab
+      switchMainTab('preview');
+      App.Toast[validation.isValid ? 'success' : 'warning'](
+        validation.isValid ? 'Validation Passed' : 'Validation Issues',
+        `${allRecords.length} records — ${validation.errors.length} error(s), ${validation.warnings.length} warning(s)`
+      );
+
+      await Audit.log({ module: 'Accounts', action: 'FilesParsed', status: 'success',
+        detail: `${selectedFiles.length} file(s), ${allRecords.length} records, ${validation.errors.length} errors` });
+
+    } catch (err) {
+      prog.style.display = 'none';
+      App.Toast.error('Parse Error', err.message);
+      await Audit.log({ module: 'Accounts', action: 'FilesParsed', status: 'error', detail: err.message });
+    }
+  });
+
+  /* ── Column map display ─────────────────────────────────── */
+  const REQUIRED_FIELDS = ['accountNo','ifsc','empName'];
+  const FIELD_LABELS = {
+    slNo:'Sl No', empCode:'Emp Code', empName:'Emp Name', bankName:'Bank Name',
+    accountNo:'Account No', netPay:'Net Pay', pan:'PAN', ifsc:'IFSC',
+    nameInBank:'Name in Bank', department:'Department', designation:'Designation', location:'Location'
+  };
+
+  function renderColumnMap() {
+    const grid = document.getElementById('col-map-grid');
+    if (!parseResults.length) { document.getElementById('col-map-section').style.display = 'none'; return; }
+
+    // Merge column maps from all parsed files
+    const merged = {};
+    parseResults.forEach(r => r.sheetResults.forEach(s => {
+      if (s.found) Object.keys(s.colMap).forEach(k => { merged[k] = true; });
+    }));
+
+    grid.innerHTML = Object.entries(FIELD_LABELS).map(([field, label]) => {
+      const found = !!merged[field];
+      const req   = REQUIRED_FIELDS.includes(field);
+      const cls   = found ? 'found' : req ? 'req-missing' : 'missing';
+      const icon  = found ? 'fa-check' : req ? 'fa-xmark' : 'fa-minus';
+      return `<div class="col-map-item ${cls}"><div class="ci"><i class="fa-solid ${icon}"></i></div>${label}</div>`;
+    }).join('');
+    document.getElementById('col-map-section').style.display = 'block';
+    document.getElementById('req-cols-guide').style.display  = 'none';
+  }
+
+  /* ══════════════════════════════════════════════════════════
+     VALIDATION REPORT
+  ══════════════════════════════════════════════════════════ */
+  function renderValidationReport() {
+    if (!validation) return;
+    document.getElementById('preview-empty').style.display   = 'none';
+    document.getElementById('preview-content').style.display = 'block';
+
+    const errCount  = validation.errors.length;
+    const warnCount = validation.warnings.length;
+    const valid     = validation.total - new Set(validation.errors.map(e => e.row)).size;
+
+    document.getElementById('vs-total').textContent    = validation.total;
+    document.getElementById('vs-valid').textContent    = valid;
+    document.getElementById('vs-errors').textContent   = errCount;
+    document.getElementById('vs-warnings').textContent = warnCount;
+    document.getElementById('r-err-count').textContent  = errCount;
+    document.getElementById('r-warn-count').textContent = warnCount;
+
+    const badge = document.getElementById('tab-preview-badge');
+    if (errCount) { badge.textContent = errCount; badge.style.display = ''; }
+    else { badge.style.display = 'none'; }
+
+    // Banner
+    const banner = document.getElementById('val-banner');
+    if (validation.isValid) {
+      banner.style.cssText = 'background:#DFF6DD;border:1px solid #B3D9B3;padding:12px 16px;border-radius:var(--radius-sm);margin-bottom:16px;font-weight:600;display:flex;align-items:center;gap:10px';
+      banner.innerHTML = '<i class="fa-solid fa-circle-check" style="color:var(--accent-green);font-size:1.2rem"></i> All records passed validation — ready to save.';
+    } else {
+      banner.style.cssText = 'background:#FDE7E9;border:1px solid #F5C6CB;padding:12px 16px;border-radius:var(--radius-sm);margin-bottom:16px;font-weight:600;display:flex;align-items:center;gap:10px';
+      banner.innerHTML = `<i class="fa-solid fa-circle-xmark" style="color:var(--accent-red);font-size:1.2rem"></i> ${errCount} error(s) found — fix before saving.`;
+    }
+
+    // Errors table
+    const errTbody = document.getElementById('err-tbody');
+    errTbody.innerHTML = errCount ? validation.errors.map(e => `
+      <tr style="background:#fef0f0">
+        <td>${e.row}</td>
+        <td style="font-size:.75rem;color:var(--text-muted)">${Utils.escapeHtml(e.rowLabel||'')}</td>
+        <td><code style="font-size:.75rem">${e.field}</code></td>
+        <td><span class="badge badge-red">${e.type}</span></td>
+        <td>${Utils.escapeHtml(e.message)}</td>
+        <td style="font-family:var(--font-mono);font-size:.75rem">${Utils.escapeHtml(String(e.value??''))}</td>
+      </tr>`).join('') : '<tr><td colspan="6" style="text-align:center;padding:30px;color:var(--text-muted)">No errors</td></tr>';
+
+    // Warnings table
+    const warnTbody = document.getElementById('warn-tbody');
+    warnTbody.innerHTML = warnCount ? validation.warnings.map(w => `
+      <tr style="background:#fffde7">
+        <td>${w.row}</td>
+        <td style="font-size:.75rem;color:var(--text-muted)">${Utils.escapeHtml(w.rowLabel||'')}</td>
+        <td><code style="font-size:.75rem">${w.field}</code></td>
+        <td><span class="badge badge-yellow">${w.type}</span></td>
+        <td>${Utils.escapeHtml(w.message)}</td>
+        <td style="font-family:var(--font-mono);font-size:.75rem">${Utils.escapeHtml(String(w.value??''))}</td>
+      </tr>`).join('') : '<tr><td colspan="6" style="text-align:center;padding:30px;color:var(--text-muted)">No warnings</td></tr>';
+
+    // Preview table (all records)
+    renderPreviewTable();
+  }
+
+  /* ── Preview table with pagination + filter ─────────────── */
+  let previewFilter = '';
+  let previewErrOnly = false;
+
+  function renderPreviewTable() {
+    if (!allRecords.length) return;
+    const errRows = new Set(validation.errors.map(e => e.row));
+    const warnRows = new Set(validation.warnings.map(w => w.row));
+    const q = previewFilter.toLowerCase();
+
+    let filtered = allRecords.map((rec, idx) => ({ rec, rowNum: idx + 1 }));
+    if (q) filtered = filtered.filter(({ rec }) =>
+      (rec.empName||'').toLowerCase().includes(q) ||
+      (rec.empCode||'').toLowerCase().includes(q) ||
+      (rec.accountNo||'').includes(q)
+    );
+    if (previewErrOnly) filtered = filtered.filter(({ rowNum }) => errRows.has(rowNum));
+
+    const total = filtered.length;
+    const pages = Math.ceil(total / PAGE_SIZE) || 1;
+    previewPage = Math.min(previewPage, pages);
+    const slice = filtered.slice((previewPage - 1) * PAGE_SIZE, previewPage * PAGE_SIZE);
+
+    document.getElementById('preview-tbody').innerHTML = slice.length ? slice.map(({ rec, rowNum }) => {
+      const hasErr  = errRows.has(rowNum);
+      const hasWarn = warnRows.has(rowNum);
+      const rowBg   = hasErr ? 'background:#fef0f0' : hasWarn ? 'background:#fffde7' : '';
+      const badge   = hasErr
+        ? '<span class="badge badge-red">Error</span>'
+        : hasWarn
+          ? '<span class="badge badge-yellow">Warning</span>'
+          : '<span class="badge badge-green">OK</span>';
+      return `<tr style="${rowBg}">
+        <td>${rowNum}</td>
+        <td>${Utils.escapeHtml(rec.empCode||'')}</td>
+        <td>${Utils.escapeHtml(rec.empName||'')}</td>
+        <td>${Utils.escapeHtml(rec.bankName||'')}</td>
+        <td style="font-family:var(--font-mono);font-size:.8rem">${Utils.escapeHtml(rec.accountNo||'')}</td>
+        <td style="text-align:right">${Utils.formatCurrency(rec.netPay||0)}</td>
+        <td style="font-family:var(--font-mono);font-size:.8rem">${Utils.escapeHtml(rec.ifsc||'')}</td>
+        <td style="font-family:var(--font-mono);font-size:.8rem">${Utils.escapeHtml(rec.pan||'')}</td>
+        <td>${badge}</td>
+      </tr>`;
+    }).join('') : '<tr><td colspan="9" style="text-align:center;padding:30px;color:var(--text-muted)">No records match filter</td></tr>';
+
+    renderPagination('preview-pagination', previewPage, pages, p => { previewPage = p; renderPreviewTable(); });
+  }
+
+  document.getElementById('preview-search').addEventListener('input', Utils.debounce(e => {
+    previewFilter = e.target.value; previewPage = 1; renderPreviewTable();
+  }, 250));
+  document.getElementById('preview-errors-only').addEventListener('change', e => {
+    previewErrOnly = e.target.checked; previewPage = 1; renderPreviewTable();
+  });
+  document.getElementById('btn-show-errors-only').addEventListener('click', () => {
+    document.getElementById('preview-errors-only').checked = true;
+    previewErrOnly = true; previewPage = 1; renderPreviewTable();
+    // Switch to all tab
+    document.querySelectorAll('[data-tab-group] .tab-btn[data-tab="r-all"]').forEach(b => b.click());
+  });
+
+  /* ── Pagination helper ──────────────────────────────────── */
+  function renderPagination(id, cur, total, onClick) {
+    const el = document.getElementById(id);
+    if (total <= 1) { el.innerHTML = ''; return; }
+    const pages = [];
+    for (let i = 1; i <= total; i++) {
+      if (i === 1 || i === total || Math.abs(i - cur) <= 2) pages.push(i);
+      else if (pages[pages.length-1] !== '…') pages.push('…');
+    }
+    el.innerHTML = `
+      <button class="page-btn" ${cur===1?'disabled':''} onclick="(${onClick.toString()})(${cur-1})">&laquo;</button>
+      ${pages.map(p => p === '…'
+        ? `<span class="page-info">…</span>`
+        : `<button class="page-btn ${p===cur?'active':''}" onclick="(${onClick.toString()})(${p})">${p}</button>`
+      ).join('')}
+      <button class="page-btn" ${cur===total?'disabled':''} onclick="(${onClick.toString()})(${cur+1})">&raquo;</button>
+      <span class="page-info">Page ${cur} of ${total}</span>`;
+  }
+
+  /* ── Download validation report ─────────────────────────── */
+  document.getElementById('btn-dl-report').addEventListener('click', async () => {
+    if (!validation) return;
+    try {
+      App.Loader.show('Generating Excel report…');
+      await Accounts.generateValidationReport(parseResults, validation);
+      App.Loader.hide();
+      App.Toast.success('Report Downloaded', 'Validation report saved to Excel.');
+    } catch (err) {
+      App.Loader.hide();
+      App.Toast.error('Export Failed', err.message);
+    }
+  });
+
+  /* ══════════════════════════════════════════════════════════
+     SAVE BATCH
+  ══════════════════════════════════════════════════════════ */
+  document.getElementById('btn-save').addEventListener('click', async () => {
+    if (!validation?.isValid) { App.Toast.error('Cannot Save', 'Fix all errors before saving.'); return; }
+
+    const confirmed = await App.Modal.confirm({
+      title:       'Save Batch',
+      message:     `Save ${allRecords.length} records to the database? This will replace the current active batch.`,
+      confirmText: 'Encrypt & Save',
+      confirmClass:'btn-success',
+    });
+    if (!confirmed) return;
+
+    try {
+      App.Loader.show('Encrypting and saving…');
+      const { batchNo } = await Accounts.saveBatch(allRecords, {
+        fileNames:         selectedFiles.map(f => f.name),
+        uploadedBy:        sess.username,
+        validationSummary: {
+          total:    validation.total,
+          errors:   validation.errors.length,
+          warnings: validation.warnings.length,
+        },
+      });
+      App.Loader.hide();
+      setStep(4);
+      App.Toast.success('Batch Saved', `Batch #${batchNo} — ${allRecords.length} records encrypted and stored.`);
+      document.getElementById('btn-export').disabled = false;
+      await loadBatches();
+      await loadDatabase();
+      switchMainTab('batches');
+    } catch (err) {
+      App.Loader.hide();
+      App.Toast.error('Save Failed', err.message);
+    }
+  });
+
+  /* ── Reset ──────────────────────────────────────────────── */
+  document.getElementById('btn-reset').addEventListener('click', () => {
+    selectedFiles = []; parseResults = []; allRecords = []; validation = null;
+    document.getElementById('acc-file-list').innerHTML = '';
+    document.getElementById('col-map-section').style.display   = 'none';
+    document.getElementById('req-cols-guide').style.display    = '';
+    document.getElementById('btn-parse').disabled = true;
+    document.getElementById('btn-save').disabled  = true;
+    document.getElementById('parse-progress').style.display    = 'none';
+    document.getElementById('preview-empty').style.display     = '';
+    document.getElementById('preview-content').style.display   = 'none';
+    document.getElementById('tab-preview-badge').style.display = 'none';
+    setStep(1);
+    App.Toast.info('Reset', 'Ready for new files.');
+  });
+
+  /* ══════════════════════════════════════════════════════════
+     BATCH HISTORY
+  ══════════════════════════════════════════════════════════ */
+  async function loadBatches() {
+    const tbody = document.getElementById('batch-tbody');
+    try {
+      const batches = await Database.getAll('accountsBatches');
+      batches.sort((a, b) => (b.batchNo || 0) - (a.batchNo || 0));
+      document.getElementById('batch-count-info').textContent = `${batches.length} batch(es)`;
+
+      tbody.innerHTML = batches.length ? batches.map(b => `
+        <tr>
+          <td><span class="batch-badge ${b.isActive ? 'batch-active' : 'batch-archived'}">
+            #${b.batchNo}
+          </span></td>
+          <td style="font-size:.8rem;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${Utils.escapeHtml((b.fileNames||[]).join(', '))}">
+            ${Utils.escapeHtml((b.fileNames||[]).join(', '))}
+          </td>
+          <td>${b.recordCount}</td>
+          <td>${Utils.escapeHtml(b.uploadedBy||'')}</td>
+          <td>${Utils.formatDateTime(b.uploadedAt)}</td>
+          <td>${b.validationSummary?.errors ?? '—'}</td>
+          <td>${b.isActive
+            ? '<span class="badge badge-green">Active</span>'
+            : '<span class="badge" style="background:var(--bg);border:1px solid var(--border);color:var(--text-muted)">Archived</span>'
+          }</td>
+          <td>
+            ${!b.isActive ? `<button class="btn btn-outline btn-sm" onclick="restoreBatch('${b.id}')"><i class="fa-solid fa-rotate-left"></i> Restore</button>` : ''}
+            ${!b.isActive ? `<button class="btn btn-ghost btn-sm" onclick="deleteBatch('${b.id}')" style="color:var(--accent-red)"><i class="fa-solid fa-trash"></i></button>` : ''}
+            ${b.isActive ? '<span style="font-size:.75rem;color:var(--accent-green);font-weight:600"><i class="fa-solid fa-circle-check"></i> Active</span>' : ''}
+          </td>
+        </tr>`).join('') :
+        '<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-muted)">No batches yet</td></tr>';
+    } catch (err) {
+      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--accent-red)">${err.message}</td></tr>`;
+    }
+  }
+
+  window.restoreBatch = async id => {
+    const ok = await App.Modal.confirm({
+      title: 'Restore Batch',
+      message: 'This will replace the active accountsMaster with the selected batch. Continue?',
+      confirmText: 'Restore',
+    });
+    if (!ok) return;
+    try {
+      App.Loader.show('Restoring batch…');
+      const { batchNo, recordCount } = await Accounts.restoreBatch(id);
+      App.Loader.hide();
+      App.Toast.success('Restored', `Batch #${batchNo} — ${recordCount} records restored.`);
+      await loadBatches(); await loadDatabase();
+    } catch (err) {
+      App.Loader.hide();
+      App.Toast.error('Restore Failed', err.message);
+    }
+  };
+
+  window.deleteBatch = async id => {
+    const ok = await App.Modal.confirm({
+      title: 'Delete Batch',
+      message: 'Delete this archived batch permanently? This cannot be undone.',
+      confirmText: 'Delete', confirmClass: 'btn-danger',
+    });
+    if (!ok) return;
+    try {
+      await Accounts.deleteBatch(id);
+      App.Toast.success('Deleted', 'Batch deleted.');
+      await loadBatches();
+    } catch (err) {
+      App.Toast.error('Delete Failed', err.message);
+    }
+  };
+
+  /* ══════════════════════════════════════════════════════════
+     VIEW DATABASE
+  ══════════════════════════════════════════════════════════ */
+  async function loadDatabase() {
+    try {
+      dbAll = await Database.getAll('accountsMaster');
+      dbAll.sort((a, b) => (a.slNo || '').localeCompare(b.slNo || '', undefined, { numeric: true }));
+      dbFiltered = [...dbAll];
+      dbPage = 1;
+      document.getElementById('acc-record-count').textContent = `${dbAll.length} records`;
+      document.getElementById('btn-export').disabled = !dbAll.length;
+      renderDbTable();
+    } catch (err) {
+      document.getElementById('acc-view-tbody').innerHTML =
+        `<tr><td colspan="9" style="text-align:center;padding:20px;color:var(--accent-red)">${err.message}</td></tr>`;
+    }
+  }
+
+  function renderDbTable() {
+    const pages = Math.ceil(dbFiltered.length / PAGE_SIZE) || 1;
+    dbPage = Math.min(dbPage, pages);
+    const slice = dbFiltered.slice((dbPage - 1) * PAGE_SIZE, dbPage * PAGE_SIZE);
+    document.getElementById('acc-view-tbody').innerHTML = slice.length ? slice.map((r, i) => `
+      <tr>
+        <td>${(dbPage - 1) * PAGE_SIZE + i + 1}</td>
+        <td>${Utils.escapeHtml(r.empCode||'')}</td>
+        <td>${Utils.escapeHtml(r.empName||'')}</td>
+        <td>${Utils.escapeHtml(r.bankName||'')}</td>
+        <td style="font-family:var(--font-mono);font-size:.8rem">${Utils.escapeHtml(r.accountNo||'')}</td>
+        <td style="text-align:right">${Utils.formatCurrency(r.netPay||0)}</td>
+        <td style="font-family:var(--font-mono);font-size:.8rem">${Utils.escapeHtml(r.ifsc||'')}</td>
+        <td style="font-family:var(--font-mono);font-size:.8rem">${Utils.escapeHtml(r.pan||'')}</td>
+        <td>${Utils.escapeHtml(r.department||'')}</td>
+      </tr>`).join('') :
+      '<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--text-muted)">No records found</td></tr>';
+
+    renderPagination('db-pagination', dbPage, pages, p => { dbPage = p; renderDbTable(); });
+  }
+
+  document.getElementById('acc-view-search').addEventListener('input', Utils.debounce(e => {
+    const q = e.target.value.toLowerCase();
+    dbFiltered = dbAll.filter(r =>
+      (r.empName||'').toLowerCase().includes(q) ||
+      (r.empCode||'').toLowerCase().includes(q) ||
+      (r.accountNo||'').includes(q) ||
+      (r.ifsc||'').toLowerCase().includes(q)
+    );
+    dbPage = 1; renderDbTable();
+  }, 250));
+
+  /* ══════════════════════════════════════════════════════════
+     EXPORT
+  ══════════════════════════════════════════════════════════ */
+  document.getElementById('btn-export').addEventListener('click', async () => {
+    try {
+      App.Loader.show('Generating Excel export…');
+      await Accounts.exportToExcel();
+      App.Loader.hide();
+      App.Toast.success('Exported', 'Accounts master exported to Excel.');
+    } catch (err) {
+      App.Loader.hide();
+      App.Toast.error('Export Failed', err.message);
+    }
+  });
+
+  /* ── Tab helper ─────────────────────────────────────────── */
+  function switchMainTab(tab) {
+    const btn = document.querySelector(`#main-tabs .tab-btn[data-tab="${tab}"]`);
+    if (btn) btn.click();
+  }
+
+  /* ── Init tab listeners (re-init App.initTabs after render) */
+  App.initTabs && App.initTabs(document.getElementById('main-tabs'));
+  App.initTabs && App.initTabs(document.getElementById('report-tabs'));
+
+  /* ── Initial data load ──────────────────────────────────── */
+  await loadBatches();
+  await loadDatabase();
+  await Audit.log({ module: 'Accounts', action: 'PageView', status: 'success' });
+
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,1376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HR Data — Employee Expense Verification</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="css/theme.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/styles.css">
+
+  <style>
+    /* Validation result chips */
+    .val-chip {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 6px 14px; border-radius: var(--radius-pill);
+      font-size: .8rem; font-weight: 700;
+    }
+    .val-chip.pass { background: #E9F5E9; color: var(--accent-green); }
+    .val-chip.fail { background: #FDE8E8; color: var(--accent-red); }
+    .val-chip.warn { background: #FFF8E1; color: #B7850A; }
+
+    /* Progress step bar */
+    .step-bar {
+      display: flex; align-items: center; gap: 0;
+      margin-bottom: 28px;
+    }
+    .step {
+      display: flex; align-items: center; gap: 8px;
+      font-size: .8rem; font-weight: 600;
+      color: var(--text-muted);
+    }
+    .step.done  { color: var(--accent-green); }
+    .step.active{ color: var(--primary); }
+    .step-num {
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      background: var(--border);
+      color: var(--text-muted);
+      display: flex; align-items: center; justify-content: center;
+      font-size: .75rem; font-weight: 800;
+      flex-shrink: 0;
+    }
+    .step.done .step-num   { background: var(--accent-green); color:#fff; }
+    .step.active .step-num { background: var(--primary); color:#fff; }
+    .step-line {
+      flex: 1; height: 2px;
+      background: var(--border);
+      margin: 0 6px;
+    }
+    .step-line.done { background: var(--accent-green); }
+
+    /* Validation summary cards */
+    .val-summary-grid {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;
+      margin-bottom: 20px;
+    }
+    .val-sum-card {
+      padding: 14px 16px; border-radius: var(--radius-md);
+      border: 1px solid var(--border); text-align: center;
+    }
+    .val-sum-card .vsn { font-size: 1.6rem; font-weight: 800; line-height: 1; }
+    .val-sum-card .vsl { font-size: .72rem; color: var(--text-muted); margin-top: 4px; font-weight: 500; }
+
+    /* Error table row highlights */
+    .row-error   { background: #FEF5F5 !important; }
+    .row-warning { background: #FFFBF0 !important; }
+    .row-ok      { background: #F5FCF5 !important; }
+
+    /* Column mapping status */
+    .col-map-grid {
+      display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;
+      margin: 12px 0;
+    }
+    .col-map-item {
+      display: flex; align-items: center; gap: 8px;
+      padding: 6px 10px;
+      border-radius: var(--radius-sm);
+      font-size: .8rem;
+    }
+    .col-map-item.found   { background: #E9F5E9; color: var(--accent-green); }
+    .col-map-item.missing { background: #FEF3EE; color: var(--accent-orange); }
+    .col-map-item.req-missing { background: #FDE8E8; color: var(--accent-red); }
+
+    /* Pagination */
+    .pagination {
+      display: flex; align-items: center; gap: 6px;
+      padding: 12px 16px;
+      border-top: 1px solid var(--border);
+      font-size: .825rem; color: var(--text-muted);
+    }
+    .page-btn {
+      width: 32px; height: 32px; border-radius: var(--radius-sm);
+      border: 1px solid var(--border); background: none;
+      cursor: pointer; font-family: var(--font); font-size: .8rem;
+      display: flex; align-items: center; justify-content: center;
+      transition: all var(--transition);
+    }
+    .page-btn:hover { border-color: var(--primary); color: var(--primary); }
+    .page-btn.active { background: var(--primary); color:#fff; border-color: var(--primary); }
+    .page-btn:disabled { opacity: .4; pointer-events: none; }
+
+    @media (max-width: 900px) {
+      .val-summary-grid { grid-template-columns: repeat(2,1fr); }
+      .col-map-grid     { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Header ────────────────────────────────────────────── -->
+<header class="app-header">
+  <button class="sidebar-toggle-btn" aria-label="Toggle sidebar">
+    <i class="fa-solid fa-bars"></i>
+  </button>
+  <div class="brand">
+    <div class="brand-icon"><i class="fa-solid fa-shield-check"></i></div>
+    <span>ExpenseVerify</span>
+    <span class="version-chip">v1.0</span>
+  </div>
+  <div class="header-search">
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <input type="text" placeholder="Search employees, accounts…" id="global-search">
+  </div>
+  <div class="header-actions">
+    <button class="header-btn" data-tooltip="Notifications">
+      <i class="fa-regular fa-bell"></i>
+    </button>
+    <div class="dropdown">
+      <div class="user-avatar" data-dropdown="user-menu">HR</div>
+      <div class="dropdown-menu" id="user-menu">
+        <div style="padding:10px 14px 8px;border-bottom:1px solid var(--border);margin-bottom:6px;">
+          <div style="font-size:.85rem;font-weight:700;color:var(--text-primary)" id="dm-name">HR User</div>
+          <div style="font-size:.75rem;color:var(--text-muted)" id="dm-role">Human Resources</div>
+        </div>
+        <button class="dropdown-item" onclick="window.location.href='dashboard.html'">
+          <i class="fa-solid fa-chart-pie"></i> Dashboard
+        </button>
+        <div class="dropdown-divider"></div>
+        <button class="dropdown-item danger" data-action="logout">
+          <i class="fa-solid fa-right-from-bracket"></i> Sign Out
+        </button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ── Sidebar ────────────────────────────────────────────── -->
+<aside class="app-sidebar">
+  <nav class="sidebar-nav">
+    <div class="nav-section-label">Main</div>
+    <button class="nav-item" data-page="dashboard.html">
+      <span class="nav-icon"><i class="fa-solid fa-chart-pie"></i></span>
+      <span class="nav-label">Dashboard</span>
+    </button>
+    <div class="nav-section-label">HR Module</div>
+    <button class="nav-item" data-page="hr.html">
+      <span class="nav-icon"><i class="fa-solid fa-upload"></i></span>
+      <span class="nav-label">HR Data Upload</span>
+    </button>
+    <button class="nav-item" data-page="hr.html" data-tab="versions">
+      <span class="nav-icon"><i class="fa-solid fa-code-branch"></i></span>
+      <span class="nav-label">Version History</span>
+    </button>
+    <button class="nav-item" data-page="hr.html" data-tab="validate">
+      <span class="nav-icon"><i class="fa-solid fa-circle-check"></i></span>
+      <span class="nav-label">Validation Report</span>
+    </button>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="sidebar-user">
+      <div class="s-avatar" id="sidebar-avatar">HR</div>
+      <div class="s-info">
+        <div class="s-name" id="sidebar-name">HR User</div>
+        <div class="s-role" id="sidebar-role">Human Resources</div>
+      </div>
+    </div>
+  </div>
+</aside>
+<div class="sidebar-overlay"></div>
+
+<!-- ── Main Content ──────────────────────────────────────── -->
+<main class="app-main">
+
+  <div class="breadcrumb-bar">
+    <span class="bc-item"><i class="fa-solid fa-house"></i> Home</span>
+    <span class="bc-sep"><i class="fa-solid fa-chevron-right"></i></span>
+    <span class="bc-item"><a href="dashboard.html">Dashboard</a></span>
+    <span class="bc-sep"><i class="fa-solid fa-chevron-right"></i></span>
+    <span class="bc-item active">HR Data Management</span>
+  </div>
+
+  <div class="page-content">
+
+    <!-- Page Header -->
+    <div class="page-header">
+      <div>
+        <h1 class="page-title">
+          <i class="fa-solid fa-users" style="color:var(--primary)"></i>
+          HR Data Management
+        </h1>
+        <p class="page-subtitle">Upload, validate, encrypt and manage the HR Saral master database</p>
+      </div>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <div id="active-version-badge" style="display:none">
+          <span class="badge badge-green">
+            <i class="fa-solid fa-database"></i>
+            Active: <span id="active-version-label">v0</span>
+            &nbsp;·&nbsp; <span id="active-record-count">0</span> records
+          </span>
+        </div>
+        <button class="btn btn-outline btn-sm" id="export-hr-btn" disabled>
+          <i class="fa-solid fa-download"></i> Export
+        </button>
+      </div>
+    </div>
+
+    <!-- Step progress bar -->
+    <div class="step-bar" id="step-bar">
+      <div class="step active" id="step1">
+        <div class="step-num">1</div>
+        <span>Select File</span>
+      </div>
+      <div class="step-line" id="line1"></div>
+      <div class="step" id="step2">
+        <div class="step-num">2</div>
+        <span>Validate</span>
+      </div>
+      <div class="step-line" id="line2"></div>
+      <div class="step" id="step3">
+        <div class="step-num">3</div>
+        <span>Review</span>
+      </div>
+      <div class="step-line" id="line3"></div>
+      <div class="step" id="step4">
+        <div class="step-num">4</div>
+        <span>Upload</span>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div data-tab-group id="main-tabs">
+      <div class="tabs-nav">
+        <button class="tab-btn active" data-tab="upload">
+          <i class="fa-solid fa-upload"></i> Upload
+        </button>
+        <button class="tab-btn" data-tab="validate" id="tab-validate">
+          <i class="fa-solid fa-circle-check"></i> Validation Report
+          <span class="nav-badge" id="err-badge" style="display:none;background:var(--accent-red)">0</span>
+        </button>
+        <button class="tab-btn" data-tab="versions">
+          <i class="fa-solid fa-code-branch"></i> Version History
+        </button>
+        <button class="tab-btn" data-tab="view">
+          <i class="fa-solid fa-table"></i> View Database
+          <span class="nav-badge" id="rec-count-badge" style="background:var(--primary)">0</span>
+        </button>
+      </div>
+
+      <!-- ── Upload Tab ──────────────────────────────────────── -->
+      <div class="tab-pane active" data-tab="upload">
+
+        <!-- Upload zone -->
+        <div class="card" style="margin-bottom:20px">
+          <div class="card-header">
+            <div class="card-title">
+              <i class="fa-solid fa-file-excel"></i> Upload HR Saral Excel
+            </div>
+            <div style="font-size:.78rem;color:var(--text-muted)">
+              Accepts .xlsx and .xls files
+            </div>
+          </div>
+          <div class="card-body">
+
+            <!-- Month / Year for this upload -->
+            <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:18px;padding:14px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-md);align-items:flex-end">
+              <div style="flex:1;min-width:140px">
+                <label class="form-label" for="upload-month" style="font-size:.8rem">
+                  <i class="fa-solid fa-calendar-days" style="color:var(--primary)"></i>
+                  Month <span class="required">*</span>
+                </label>
+                <select id="upload-month" class="form-control" style="padding:7px 10px">
+                  <option value="">— Select Month —</option>
+                  <option value="January">January</option>
+                  <option value="February">February</option>
+                  <option value="March">March</option>
+                  <option value="April">April</option>
+                  <option value="May">May</option>
+                  <option value="June">June</option>
+                  <option value="July">July</option>
+                  <option value="August">August</option>
+                  <option value="September">September</option>
+                  <option value="October">October</option>
+                  <option value="November">November</option>
+                  <option value="December">December</option>
+                </select>
+              </div>
+              <div style="flex:1;min-width:120px">
+                <label class="form-label" for="upload-year" style="font-size:.8rem">
+                  <i class="fa-solid fa-calendar" style="color:var(--primary)"></i>
+                  Year <span class="required">*</span>
+                </label>
+                <input type="number" id="upload-year" class="form-control"
+                       placeholder="e.g. 2025" min="2000" max="2099"
+                       style="padding:7px 10px">
+              </div>
+              <div style="font-size:.78rem;color:var(--text-muted);padding-bottom:2px">
+                <i class="fa-solid fa-circle-info"></i>
+                Applied to all records where Month/Year is blank in the Excel.
+              </div>
+            </div>
+
+            <label class="upload-zone" id="hr-upload-zone" for="hr-file-input">
+              <div class="upload-icon"><i class="fa-solid fa-file-excel"></i></div>
+              <h5>Drop HR Excel here or click to browse</h5>
+              <p>Supports .xlsx and .xls — Max 50 MB — Multi-sheet workbooks supported</p>
+            </label>
+            <input type="file" id="hr-file-input" accept=".xlsx,.xls" style="display:none">
+
+            <!-- File info card (shown after selection) -->
+            <div id="hr-file-info" style="display:none;margin-top:16px">
+              <div style="display:flex;align-items:center;gap:14px;padding:14px;background:var(--bg);border-radius:var(--radius-md);border:1px solid var(--border)">
+                <div style="width:48px;height:48px;background:#E9F5E9;border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:center;font-size:1.4rem;color:var(--accent-green);flex-shrink:0">
+                  <i class="fa-solid fa-file-excel"></i>
+                </div>
+                <div style="flex:1;min-width:0">
+                  <div id="hr-file-name" style="font-weight:700;font-size:.9rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
+                  <div style="display:flex;gap:16px;margin-top:3px">
+                    <span id="hr-file-size" style="font-size:.78rem;color:var(--text-muted)"></span>
+                    <span id="hr-sheet-count" style="font-size:.78rem;color:var(--text-muted)"></span>
+                  </div>
+                </div>
+                <button class="btn btn-ghost btn-sm" id="hr-clear-btn">
+                  <i class="fa-solid fa-xmark"></i> Remove
+                </button>
+              </div>
+
+              <!-- Column mapping preview -->
+              <div style="margin-top:14px">
+                <div style="font-size:.8rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px">
+                  Column Detection
+                </div>
+                <div class="col-map-grid" id="col-map-grid"></div>
+              </div>
+            </div>
+
+            <!-- Required columns guide -->
+            <div style="margin-top:18px;padding:14px;background:var(--bg);border-radius:var(--radius-sm);border:1px solid var(--border)">
+              <div style="font-size:.8rem;font-weight:700;color:var(--text-secondary);margin-bottom:10px;text-transform:uppercase;letter-spacing:.04em">
+                Required Columns
+              </div>
+              <div style="display:flex;flex-wrap:wrap;gap:8px">
+                <span class="badge badge-red">Employee ID</span>
+                <span class="badge badge-red">Employee Name</span>
+                <span class="badge badge-blue">Bank Account Number</span>
+                <span class="badge badge-blue">IFSC</span>
+                <span class="badge badge-blue">Month</span>
+                <span class="badge badge-blue">Year</span>
+                <span class="badge badge-blue">Branch</span>
+                <span class="badge badge-blue">Division</span>
+                <span class="badge badge-blue">Bank Name</span>
+              </div>
+              <div style="margin-top:8px;font-size:.75rem;color:var(--text-muted)">
+                <i class="fa-solid fa-circle-info"></i>
+                Red = Required (blocks upload if missing) &nbsp;|&nbsp; Blue = Recommended (shown as warning if blank)
+              </div>
+            </div>
+
+            <!-- Action buttons -->
+            <div style="margin-top:18px;display:flex;gap:10px;flex-wrap:wrap">
+              <button class="btn btn-primary" id="hr-validate-btn" disabled>
+                <i class="fa-solid fa-circle-check"></i> Validate Data
+              </button>
+              <button class="btn btn-success" id="hr-upload-btn" disabled>
+                <i class="fa-solid fa-database"></i> Encrypt & Save to Database
+              </button>
+              <button class="btn btn-ghost" id="hr-clear-all-btn" style="display:none">
+                <i class="fa-solid fa-rotate-left"></i> Start Over
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Validation progress (shown during validation) -->
+        <div id="validation-progress" style="display:none">
+          <div class="card">
+            <div class="card-body">
+              <div style="font-size:.9rem;font-weight:600;color:var(--text-primary);margin-bottom:12px" id="val-progress-label">
+                Parsing Excel…
+              </div>
+              <div class="progress-bar-wrap">
+                <div class="progress-bar-fill" id="val-progress-bar" style="width:0%"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /upload tab -->
+
+      <!-- ── Validation Report Tab ───────────────────────────── -->
+      <div class="tab-pane" data-tab="validate">
+
+        <div id="val-empty-state">
+          <div class="card">
+            <div class="card-body">
+              <div class="empty-state">
+                <div class="empty-icon"><i class="fa-solid fa-clipboard-check"></i></div>
+                <h5>No validation run yet</h5>
+                <p>Upload an Excel file and click "Validate Data" to see the report here.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="val-report-content" style="display:none">
+
+          <!-- Summary cards -->
+          <div class="val-summary-grid" id="val-summary-grid">
+            <!-- filled by JS -->
+          </div>
+
+          <!-- Status Banner -->
+          <div id="val-status-banner" style="padding:14px 18px;border-radius:var(--radius-md);margin-bottom:20px;display:flex;align-items:center;gap:12px">
+            <i id="val-banner-icon" style="font-size:1.3rem"></i>
+            <div>
+              <div id="val-banner-title" style="font-weight:700;font-size:.95rem"></div>
+              <div id="val-banner-subtitle" style="font-size:.82rem;margin-top:2px;opacity:.85"></div>
+            </div>
+            <div style="margin-left:auto;display:flex;gap:8px">
+              <button class="btn btn-ghost btn-sm" id="download-report-btn">
+                <i class="fa-solid fa-download"></i> Download Report
+              </button>
+            </div>
+          </div>
+
+          <!-- Tabs inside validation -->
+          <div data-tab-group id="val-tabs">
+            <div class="tabs-nav">
+              <button class="tab-btn active" data-tab="val-errors">
+                <i class="fa-solid fa-circle-exclamation" style="color:var(--accent-red)"></i>
+                Errors <span class="nav-badge" id="errors-count-badge" style="background:var(--accent-red)">0</span>
+              </button>
+              <button class="tab-btn" data-tab="val-warnings">
+                <i class="fa-solid fa-triangle-exclamation" style="color:var(--accent-yellow)"></i>
+                Warnings <span class="nav-badge" id="warnings-count-badge" style="background:#B7850A">0</span>
+              </button>
+              <button class="tab-btn" data-tab="val-preview">
+                <i class="fa-solid fa-table"></i>
+                All Records
+              </button>
+            </div>
+
+            <!-- Errors tab -->
+            <div class="tab-pane active" data-tab="val-errors">
+              <div class="card">
+                <div class="table-wrap" style="max-height:420px;overflow-y:auto">
+                  <table class="data-table">
+                    <thead>
+                      <tr>
+                        <th>Row</th><th>Field</th><th>Error Type</th><th>Message</th><th>Value</th>
+                      </tr>
+                    </thead>
+                    <tbody id="errors-tbody"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <!-- Warnings tab -->
+            <div class="tab-pane" data-tab="val-warnings">
+              <div class="card">
+                <div class="table-wrap" style="max-height:420px;overflow-y:auto">
+                  <table class="data-table">
+                    <thead>
+                      <tr>
+                        <th>Row</th><th>Field</th><th>Warning Type</th><th>Message</th><th>Value</th>
+                      </tr>
+                    </thead>
+                    <tbody id="warnings-tbody"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <!-- Preview all records -->
+            <div class="tab-pane" data-tab="val-preview">
+              <div class="card">
+                <div class="table-toolbar">
+                  <div class="table-search">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input type="text" id="preview-search" placeholder="Filter records…">
+                  </div>
+                  <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
+                    <label class="check-label" style="font-size:.8rem">
+                      <input type="checkbox" id="show-errors-only"> Errors only
+                    </label>
+                  </div>
+                </div>
+                <div class="table-wrap" style="max-height:420px;overflow-y:auto">
+                  <table class="data-table">
+                    <thead>
+                      <tr>
+                        <th>Row</th><th>Status</th><th>Emp ID</th><th>Name</th>
+                        <th>Bank</th><th>Account No</th><th>IFSC</th>
+                        <th>Name in Bank</th><th>Branch</th><th>Division</th>
+                      </tr>
+                    </thead>
+                    <tbody id="preview-tbody"></tbody>
+                  </table>
+                </div>
+                <div class="pagination" id="preview-pagination"></div>
+              </div>
+            </div>
+
+          </div><!-- /val-tabs -->
+        </div>
+
+      </div><!-- /validate tab -->
+
+      <!-- ── Version History Tab ─────────────────────────────── -->
+      <div class="tab-pane" data-tab="versions">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">
+              <i class="fa-solid fa-code-branch"></i> HR Version History
+            </div>
+            <div style="font-size:.78rem;color:var(--text-muted)">
+              Each upload creates a new encrypted version. You can restore any previous version.
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Version</th>
+                  <th>File Name</th>
+                  <th>Uploaded By</th>
+                  <th>Date & Time</th>
+                  <th>Records</th>
+                  <th>Errors</th>
+                  <th>Status</th>
+                  <th>Hash</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="version-tbody">
+                <tr>
+                  <td colspan="9" style="text-align:center;padding:40px;color:var(--text-muted)">
+                    No HR versions uploaded yet
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── View Database Tab ──────────────────────────────── -->
+      <div class="tab-pane" data-tab="view">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">
+              <i class="fa-solid fa-database"></i> HR Master Records
+            </div>
+            <div id="view-record-count" style="font-size:.78rem;color:var(--text-muted)">0 records</div>
+          </div>
+          <div class="table-toolbar">
+            <div class="table-search">
+              <i class="fa-solid fa-magnifying-glass"></i>
+              <input type="text" id="hr-view-search" placeholder="Search by name, ID, IFSC, account…">
+            </div>
+            <div style="margin-left:auto;display:flex;gap:8px">
+              <select class="form-control" id="view-search-field" style="width:160px;padding:7px 10px">
+                <option value="all">All Fields</option>
+                <option value="employeeId">Employee ID</option>
+                <option value="employeeName">Employee Name</option>
+                <option value="bankAccountNumber">Account Number</option>
+                <option value="ifsc">IFSC</option>
+                <option value="branch">Branch</option>
+                <option value="division">Division</option>
+              </select>
+            </div>
+          </div>
+          <div class="table-wrap" style="max-height:540px;overflow-y:auto">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Emp ID</th>
+                  <th>Employee Name</th>
+                  <th>Bank Name</th>
+                  <th>Account Number</th>
+                  <th>IFSC</th>
+                  <th>Name in Bank</th>
+                  <th>Branch</th>
+                  <th>Division</th>
+                  <th>Month/Year</th>
+                </tr>
+              </thead>
+              <tbody id="hr-view-tbody">
+                <tr>
+                  <td colspan="10" style="text-align:center;padding:40px;color:var(--text-muted)">
+                    No HR data loaded yet
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="pagination" id="view-pagination"></div>
+        </div>
+      </div>
+
+    </div><!-- /main-tabs -->
+  </div><!-- /page-content -->
+
+</main>
+
+<!-- ── Confirm Upload Modal (injected by JS) ─────────────── -->
+
+<!-- External Libraries -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+
+<!-- App Scripts -->
+<script src="js/utils.js"></script>
+<script src="js/database.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/audit.js"></script>
+<script src="js/encryption.js"></script>
+<script src="js/app.js"></script>
+<script src="js/hr.js"></script>
+
+<script>
+/* ============================================================
+   HR Page Controller
+   ============================================================ */
+(async () => {
+
+  /* ── Auth guard ─────────────────────────────────────────── */
+  if (!Auth.requireAuth(['admin', 'hr'])) return;
+  const sess = Auth.getCurrentUser();
+  await App.init();
+
+  /* ── Header / sidebar user info ─────────────────────────── */
+  document.getElementById('dm-name').textContent       = sess.displayName || sess.username;
+  document.getElementById('dm-role').textContent       = Auth.getRoleInfo(sess.role).label;
+  document.querySelector('.user-avatar').textContent   = Utils.getInitials(sess.displayName || sess.username);
+  document.getElementById('sidebar-avatar').textContent = Utils.getInitials(sess.displayName || sess.username);
+  document.getElementById('sidebar-name').textContent  = sess.displayName || sess.username;
+  document.getElementById('sidebar-role').textContent  = Auth.getRoleInfo(sess.role).label;
+
+  App.setBreadcrumb([
+    { label: 'Home', icon: 'fa-house' },
+    { label: 'Dashboard' },
+    { label: 'HR Data Management' }
+  ]);
+
+  /* ── Pre-fill current year ─────────────────────────────── */
+  document.getElementById('upload-year').value = new Date().getFullYear();
+
+  /* ── State ──────────────────────────────────────────────── */
+  let _selectedFile      = null;
+  let _parsedRecords     = [];
+  let _validationResult  = null;
+  let _colMap            = {};
+  let _currentStep       = 1;
+
+  /* Declare these here so loadViewTab() (called inside loadActiveVersionInfo)
+     can access them without hitting the temporal dead zone. */
+  const PAGE_SIZE  = 50;
+  let _viewPage    = 1;
+  let _viewRecords = [];
+
+  /* ── Load active version info ────────────────────────────── */
+  async function loadActiveVersionInfo() {
+    const latest = await HR.getLatestVersion();
+    if (latest) {
+      document.getElementById('active-version-badge').style.display = '';
+      document.getElementById('active-version-label').textContent   = `v${latest.version}`;
+      document.getElementById('active-record-count').textContent    = Utils.formatNumber(latest.recordCount);
+      document.getElementById('rec-count-badge').textContent        = Utils.formatNumber(latest.recordCount);
+      document.getElementById('export-hr-btn').disabled = false;
+    }
+    await loadViewTab();
+    await loadVersionHistory();
+  }
+
+  try { await loadActiveVersionInfo(); } catch (e) { console.warn('[HR] Init load error:', e); }
+
+  /* ── Upload zone interactions ────────────────────────────── */
+  const zone      = document.getElementById('hr-upload-zone');
+  const fileInput = document.getElementById('hr-file-input');
+
+  zone.addEventListener('dragover',  e   => { e.preventDefault(); zone.classList.add('dragover'); });
+  zone.addEventListener('dragleave', ()  => zone.classList.remove('dragover'));
+  zone.addEventListener('drop',      e   => {
+    e.preventDefault(); zone.classList.remove('dragover');
+    const f = e.dataTransfer.files[0];
+    if (f) handleFileSelection(f);
+  });
+  fileInput.addEventListener('change', e => { if (e.target.files[0]) handleFileSelection(e.target.files[0]); });
+
+  function handleFileSelection(file) {
+    if (!/\.(xlsx|xls)$/i.test(file.name)) {
+      App.Toast.error('Invalid File', 'Please upload an Excel file (.xlsx or .xls).');
+      return;
+    }
+    if (file.size > 50 * 1024 * 1024) {
+      App.Toast.error('File Too Large', 'Maximum file size is 50 MB.');
+      return;
+    }
+    _selectedFile = file;
+    showFileInfo(file);
+    previewColumns(file);
+    setStep(1);
+  }
+
+  async function showFileInfo(file) {
+    document.getElementById('hr-file-info').style.display = 'block';
+    document.getElementById('hr-file-name').textContent   = file.name;
+    document.getElementById('hr-file-size').textContent   = Utils.formatFileSize(file.size);
+    document.getElementById('hr-validate-btn').disabled   = false;
+    document.getElementById('hr-clear-all-btn').style.display = '';
+  }
+
+  async function previewColumns(file) {
+    try {
+      const buf = await Utils.readFileAsArrayBuffer(file);
+      const wb  = XLSX.read(buf, { type: 'array', sheetRows: 12 });
+      document.getElementById('hr-sheet-count').textContent = `${wb.SheetNames.length} sheet(s): ${wb.SheetNames.join(', ')}`;
+
+      /* Read first sheet header to detect columns */
+      const ws      = wb.Sheets[wb.SheetNames[0]];
+      const rows    = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: false });
+      let headerRow = [];
+      for (const row of rows.slice(0, 10)) {
+        if (row.filter(c => String(c).trim()).length >= 3) { headerRow = row; break; }
+      }
+      _colMap = HR.mapColumns(headerRow);
+
+      /* Render column map */
+      const grid = document.getElementById('col-map-grid');
+      const allFields = [...HR.REQUIRED_COLUMNS, ...HR.OPTIONAL_COLUMNS];
+      grid.innerHTML  = allFields.map(field => {
+        const found    = _colMap[field] !== undefined;
+        const required = HR.REQUIRED_COLUMNS.includes(field);
+        const cls      = found ? 'found' : required ? 'req-missing' : 'missing';
+        const icon     = found ? 'fa-check' : 'fa-xmark';
+        const label    = field.replace(/([A-Z])/g, ' $1').trim();
+        return `<div class="col-map-item ${cls}">
+          <i class="fa-solid ${icon}"></i>
+          ${Utils.escapeHtml(label)}
+          ${found ? `<span style="opacity:.7;font-size:.72rem">(col ${_colMap[field] + 1})</span>` : ''}
+        </div>`;
+      }).join('');
+    } catch (err) {
+      console.warn('[HR] Column preview failed:', err);
+    }
+  }
+
+  /* ── Clear file ─────────────────────────────────────────── */
+  document.getElementById('hr-clear-btn').addEventListener('click', clearAll);
+  document.getElementById('hr-clear-all-btn').addEventListener('click', clearAll);
+
+  function clearAll() {
+    _selectedFile     = null;
+    _parsedRecords    = [];
+    _validationResult = null;
+    fileInput.value   = '';
+    document.getElementById('hr-file-info').style.display    = 'none';
+    document.getElementById('hr-validate-btn').disabled      = true;
+    document.getElementById('hr-upload-btn').disabled        = true;
+    document.getElementById('hr-clear-all-btn').style.display = 'none';
+    document.getElementById('validation-progress').style.display = 'none';
+    document.getElementById('val-empty-state').style.display     = '';
+    document.getElementById('val-report-content').style.display  = 'none';
+    document.getElementById('err-badge').style.display = 'none';
+    setStep(1);
+  }
+
+  /* ── Validate button ─────────────────────────────────────── */
+  document.getElementById('hr-validate-btn').addEventListener('click', runValidation);
+
+  async function runValidation() {
+    if (!_selectedFile) return;
+
+    const uploadMonth = document.getElementById('upload-month').value.trim();
+    const uploadYear  = document.getElementById('upload-year').value.trim();
+    if (!uploadMonth || !uploadYear) {
+      App.Toast.warning('Month / Year Required', 'Please select the Month and Year for this upload before validating.');
+      return;
+    }
+
+    document.getElementById('hr-validate-btn').disabled = true;
+    document.getElementById('validation-progress').style.display = '';
+
+    try {
+      setStep(2);
+      await updateProgress('Parsing Excel file…', 10);
+      const buf = await Utils.readFileAsArrayBuffer(_selectedFile);
+
+      await updateProgress('Reading workbook…', 30);
+      const wb  = XLSX.read(buf, { type: 'array', raw: false });
+
+      await updateProgress('Extracting records…', 55);
+      _parsedRecords = HR.parseSheet(wb);
+
+      if (!_parsedRecords.length) {
+        App.Toast.error('No Data', 'No records found in the Excel file. Check the file format.');
+        return;
+      }
+
+      await updateProgress('Running validation rules…', 75);
+      _validationResult = HR.validate(_parsedRecords);
+
+      await updateProgress('Generating report…', 92);
+      await Utils.sleep(300);
+
+      await updateProgress('Done', 100);
+      await Utils.sleep(200);
+
+      document.getElementById('validation-progress').style.display = 'none';
+      renderValidationReport();
+      setStep(3);
+
+      /* Switch to validation tab */
+      document.querySelector('[data-tab="validate"]').click();
+
+      if (_validationResult.isValid) {
+        App.Toast.success('Validation Passed',
+          `${_parsedRecords.length} records validated. No errors found.`);
+        document.getElementById('hr-upload-btn').disabled = false;
+      } else {
+        App.Toast.warning('Validation Issues',
+          `${_validationResult.errors.length} error(s) found. Review and fix before uploading.`);
+      }
+
+    } catch (err) {
+      console.error('[HR] Validation error:', err);
+      App.Toast.error('Validation Error', err.message);
+      document.getElementById('hr-validate-btn').disabled = false;
+      setStep(1);
+    } finally {
+      document.getElementById('validation-progress').style.display = 'none';
+    }
+  }
+
+  async function updateProgress(label, pct) {
+    document.getElementById('val-progress-label').textContent   = label;
+    document.getElementById('val-progress-bar').style.width     = `${pct}%`;
+    await Utils.sleep(80);
+  }
+
+  /* ── Render validation report ────────────────────────────── */
+  function renderValidationReport() {
+    const vr  = _validationResult;
+    const cnt = _parsedRecords.length;
+    const errRows = new Set(vr.errors.map(e => e.row));
+    const warnRows = new Set(vr.warnings.map(w => w.row));
+    const okCount  = cnt - errRows.size;
+
+    document.getElementById('val-empty-state').style.display    = 'none';
+    document.getElementById('val-report-content').style.display = '';
+
+    /* Summary cards */
+    const grid = document.getElementById('val-summary-grid');
+    grid.innerHTML = [
+      { value: cnt,                  label: 'Total Records',   color: '#0078D4', bg: '#EFF6FC' },
+      { value: okCount,              label: 'Valid Records',    color: '#107C10', bg: '#E9F5E9' },
+      { value: vr.errors.length,     label: 'Errors',          color: '#A4262C', bg: '#FDE8E8' },
+      { value: vr.warnings.length,   label: 'Warnings',        color: '#B7850A', bg: '#FFF8E1' }
+    ].map(c => `
+      <div class="val-sum-card" style="border-color:${c.color}20;background:${c.bg}">
+        <div class="vsn" style="color:${c.color}">${Utils.formatNumber(c.value)}</div>
+        <div class="vsl">${c.label}</div>
+      </div>`).join('');
+
+    /* Status banner */
+    const banner = document.getElementById('val-status-banner');
+    if (vr.isValid) {
+      banner.style.background = '#E9F5E9';
+      banner.style.border     = '1px solid #C7E2C7';
+      document.getElementById('val-banner-icon').className         = 'fa-solid fa-circle-check';
+      document.getElementById('val-banner-icon').style.color       = 'var(--accent-green)';
+      document.getElementById('val-banner-title').textContent      = 'Validation Passed — Ready to Upload';
+      document.getElementById('val-banner-subtitle').textContent   = `All ${cnt} records passed validation. You can now encrypt and save to the database.`;
+      document.getElementById('hr-upload-btn').disabled = false;
+    } else {
+      banner.style.background = '#FDE8E8';
+      banner.style.border     = '1px solid #F5C6C6';
+      document.getElementById('val-banner-icon').className         = 'fa-solid fa-circle-xmark';
+      document.getElementById('val-banner-icon').style.color       = 'var(--accent-red)';
+      document.getElementById('val-banner-title').textContent      = `Validation Failed — ${vr.errors.length} Error(s) Found`;
+      document.getElementById('val-banner-subtitle').textContent   = 'Fix the errors in your Excel file and re-upload. Warnings are non-blocking.';
+    }
+
+    /* Badge */
+    const errBadge = document.getElementById('err-badge');
+    if (vr.errors.length) {
+      errBadge.style.display    = '';
+      errBadge.textContent      = vr.errors.length;
+    }
+    document.getElementById('errors-count-badge').textContent   = vr.errors.length;
+    document.getElementById('warnings-count-badge').textContent = vr.warnings.length;
+
+    /* Errors table */
+    const errorTbody = document.getElementById('errors-tbody');
+    const typeLabels = {
+      BLANK_EMP_ID: 'Blank Employee ID', DUPLICATE_EMP_ID: 'Duplicate Employee ID',
+      BLANK_NAME: 'Blank Name', BLANK_ACCOUNT: 'Blank Account', DUPLICATE_ACCOUNT: 'Duplicate Account',
+      INVALID_ACCOUNT: 'Invalid Account', BLANK_IFSC: 'Blank IFSC', INVALID_IFSC: 'Invalid IFSC'
+    };
+    if (!vr.errors.length) {
+      errorTbody.innerHTML = `<tr><td colspan="5"><div class="empty-state" style="padding:30px">
+        <div class="empty-icon"><i class="fa-solid fa-circle-check" style="color:var(--accent-green)"></i></div>
+        <h5 style="color:var(--accent-green)">No errors found</h5></div></td></tr>`;
+    } else {
+      errorTbody.innerHTML = vr.errors.map(e => `<tr class="row-error">
+        <td><span class="badge badge-red">${e.row}</span></td>
+        <td style="font-size:.8rem">${Utils.escapeHtml(e.field)}</td>
+        <td><span class="badge badge-red">${Utils.escapeHtml(typeLabels[e.type] || e.type)}</span></td>
+        <td style="font-size:.825rem">${Utils.escapeHtml(e.message)}</td>
+        <td style="font-size:.8rem;font-family:monospace;color:var(--accent-red)">${Utils.escapeHtml(e.value || '(empty)')}</td>
+      </tr>`).join('');
+    }
+
+    /* Warnings table */
+    const warnTbody = document.getElementById('warnings-tbody');
+    if (!vr.warnings.length) {
+      warnTbody.innerHTML = `<tr><td colspan="5"><div class="empty-state" style="padding:30px">
+        <div class="empty-icon"><i class="fa-solid fa-circle-check" style="color:var(--accent-green)"></i></div>
+        <h5 style="color:var(--accent-green)">No warnings</h5></div></td></tr>`;
+    } else {
+      warnTbody.innerHTML = vr.warnings.map(w => `<tr class="row-warning">
+        <td><span class="badge badge-yellow">${w.row}</span></td>
+        <td style="font-size:.8rem">${Utils.escapeHtml(w.field)}</td>
+        <td><span class="badge badge-yellow">${Utils.escapeHtml(w.type.replace(/_/g,' '))}</span></td>
+        <td style="font-size:.825rem">${Utils.escapeHtml(w.message)}</td>
+        <td style="font-size:.8rem">${Utils.escapeHtml(w.value || '(empty)')}</td>
+      </tr>`).join('');
+    }
+
+    /* Preview all records with pagination */
+    renderPreviewTable(_parsedRecords, errRows, warnRows);
+    App.initTabs(document.getElementById('val-tabs'));
+  }
+
+  /* ── Preview table with pagination ──────────────────────── */
+  let _previewPage = 1;
+
+  function renderPreviewTable(records, errRows, warnRows, filter = '', errOnly = false) {
+    let filtered = records;
+    if (filter) {
+      const q = filter.toLowerCase();
+      filtered = filtered.filter(r => Object.values(r).some(v => String(v).toLowerCase().includes(q)));
+    }
+    if (errOnly) filtered = filtered.filter(r => errRows.has(r._row));
+
+    const total  = filtered.length;
+    const pages  = Math.ceil(total / PAGE_SIZE);
+    _previewPage = Math.min(_previewPage, pages || 1);
+    const start  = (_previewPage - 1) * PAGE_SIZE;
+    const slice  = filtered.slice(start, start + PAGE_SIZE);
+
+    const tbody = document.getElementById('preview-tbody');
+    if (!slice.length) {
+      tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:30px;color:var(--text-muted)">No records match filter</td></tr>`;
+    } else {
+      tbody.innerHTML = slice.map(r => {
+        const hasErr  = errRows.has(r._row);
+        const hasWarn = warnRows.has(r._row) && !hasErr;
+        const cls     = hasErr ? 'row-error' : hasWarn ? 'row-warning' : '';
+        const statusBadge = hasErr
+          ? `<span class="badge badge-red"><i class="fa-solid fa-xmark"></i> Error</span>`
+          : hasWarn
+            ? `<span class="badge badge-yellow"><i class="fa-solid fa-triangle-exclamation"></i> Warning</span>`
+            : `<span class="badge badge-green"><i class="fa-solid fa-check"></i> OK</span>`;
+        return `<tr class="${cls}">
+          <td style="font-size:.78rem;color:var(--text-muted)">${r._row}</td>
+          <td>${statusBadge}</td>
+          <td style="font-weight:600;font-size:.82rem">${Utils.escapeHtml(r.employeeId||'—')}</td>
+          <td>${Utils.escapeHtml(r.employeeName||'—')}</td>
+          <td style="font-size:.78rem">${Utils.escapeHtml(r.bankName||'—')}</td>
+          <td style="font-family:monospace;font-size:.78rem">${Utils.escapeHtml(r.bankAccountNumber||'—')}</td>
+          <td style="font-family:monospace;font-size:.78rem">${Utils.escapeHtml(r.ifsc||'—')}</td>
+          <td style="font-size:.78rem">${Utils.escapeHtml(r.nameInBank||'—')}</td>
+          <td style="font-size:.78rem">${Utils.escapeHtml(r.branch||'—')}</td>
+          <td style="font-size:.78rem">${Utils.escapeHtml(r.division||'—')}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    /* Pagination */
+    const pagEl = document.getElementById('preview-pagination');
+    pagEl.innerHTML = `
+      <span>${Utils.formatNumber(total)} records</span>
+      <div style="margin-left:auto;display:flex;gap:4px">
+        <button class="page-btn" ${_previewPage === 1 ? 'disabled' : ''} onclick="changePage('preview', -1)">
+          <i class="fa-solid fa-chevron-left"></i>
+        </button>
+        <span style="display:flex;align-items:center;padding:0 10px;font-size:.8rem">
+          Page ${_previewPage} of ${pages || 1}
+        </span>
+        <button class="page-btn" ${_previewPage >= pages ? 'disabled' : ''} onclick="changePage('preview', 1)">
+          <i class="fa-solid fa-chevron-right"></i>
+        </button>
+      </div>`;
+  }
+
+  window.changePage = function(tab, dir) {
+    if (tab === 'preview') {
+      const vr = _validationResult;
+      const errRows  = new Set(vr.errors.map(e => e.row));
+      const warnRows = new Set(vr.warnings.map(w => w.row));
+      _previewPage += dir;
+      renderPreviewTable(_parsedRecords, errRows, warnRows,
+        document.getElementById('preview-search').value,
+        document.getElementById('show-errors-only').checked);
+    }
+    if (tab === 'view') {
+      _viewPage += dir;
+      renderViewTable();
+    }
+  };
+
+  document.getElementById('preview-search').addEventListener('input', Utils.debounce(e => {
+    _previewPage = 1;
+    const vr = _validationResult;
+    if (!vr) return;
+    const errRows  = new Set(vr.errors.map(e => e.row));
+    const warnRows = new Set(vr.warnings.map(w => w.row));
+    renderPreviewTable(_parsedRecords, errRows, warnRows, e.target.value,
+      document.getElementById('show-errors-only').checked);
+  }));
+
+  document.getElementById('show-errors-only').addEventListener('change', e => {
+    _previewPage = 1;
+    const vr = _validationResult;
+    if (!vr) return;
+    const errRows  = new Set(vr.errors.map(e => e.row));
+    const warnRows = new Set(vr.warnings.map(w => w.row));
+    renderPreviewTable(_parsedRecords, errRows, warnRows,
+      document.getElementById('preview-search').value, e.target.checked);
+  });
+
+  /* ── Download validation report ──────────────────────────── */
+  document.getElementById('download-report-btn').addEventListener('click', async () => {
+    if (!_validationResult || !_parsedRecords.length) return;
+    App.Loader.show('Generating report…');
+    try {
+      await HR.generateValidationReport(_parsedRecords, _validationResult, _selectedFile?.name || 'unknown');
+      App.Toast.success('Downloaded', 'Validation report saved.');
+    } catch (err) {
+      App.Toast.error('Error', err.message);
+    } finally {
+      App.Loader.hide();
+    }
+  });
+
+  /* ── Upload (encrypt & save) ─────────────────────────────── */
+  document.getElementById('hr-upload-btn').addEventListener('click', async () => {
+    if (!_parsedRecords.length) return;
+
+    const validCount   = _validationResult?.isValid ? _parsedRecords.length : 'some';
+    const hasErrors    = _validationResult && !_validationResult.isValid;
+
+    let proceedMsg = `This will encrypt and save ${_parsedRecords.length} records as a new HR version.`;
+    if (hasErrors) proceedMsg += ` NOTE: ${_validationResult.errors.length} validation error(s) exist. Upload anyway?`;
+
+    const ok = await App.Modal.confirm({
+      title:        'Confirm Upload',
+      message:      proceedMsg,
+      confirmText:  'Encrypt & Save',
+      confirmClass: hasErrors ? 'btn-warning' : 'btn-success',
+      cancelText:   'Cancel'
+    });
+    if (!ok) return;
+
+    App.Loader.show('Encrypting records with AES-256…');
+    try {
+      /* Apply upload-level Month/Year to records that have blank values */
+      const uploadMonth = document.getElementById('upload-month').value.trim();
+      const uploadYear  = document.getElementById('upload-year').value.trim();
+      if (uploadMonth || uploadYear) {
+        _parsedRecords = _parsedRecords.map(r => ({
+          ...r,
+          month: r.month || uploadMonth,
+          year:  r.year  || uploadYear
+        }));
+      }
+
+      const validSummary = {
+        errors:   _validationResult?.errors.length   || 0,
+        warnings: _validationResult?.warnings.length || 0,
+        isValid:  _validationResult?.isValid         || false
+      };
+
+      App.Loader.update('Saving to database…');
+      const result = await HR.saveVersion(_parsedRecords, {
+        fileName:          _selectedFile.name,
+        uploadedBy:        sess.username,
+        validationSummary: validSummary
+      });
+
+      setStep(4);
+      await Audit.log({
+        module: 'HR', action: 'Upload', status: 'success',
+        detail: `v${result.version} — ${result.recordCount} records — ${_selectedFile.name}`
+      });
+
+      App.Toast.success(
+        `HR Database v${result.version} Saved`,
+        `${Utils.formatNumber(result.recordCount)} records encrypted and stored.`
+      );
+
+      /* Refresh UI */
+      await loadActiveVersionInfo();
+      clearAll();
+      document.querySelector('[data-tab="versions"]').click();
+
+    } catch (err) {
+      console.error('[HR] Upload error:', err);
+      App.Toast.error('Upload Failed', err.message);
+      await Audit.log({ module: 'HR', action: 'Upload', status: 'error', detail: err.message });
+    } finally {
+      App.Loader.hide();
+    }
+  });
+
+  /* ── Version History ─────────────────────────────────────── */
+  async function loadVersionHistory() {
+    const versions = await Database.getAll('versionHistory');
+    const hrVers   = versions.filter(v => v.type === 'hr').sort((a,b) => b.version - a.version);
+    const tbody    = document.getElementById('version-tbody');
+
+    if (!hrVers.length) {
+      tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--text-muted)">
+        No HR versions uploaded yet</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = hrVers.map(v => {
+      const activeBadge = v.isActive
+        ? `<span class="badge badge-green"><i class="fa-solid fa-circle" style="font-size:.5rem"></i> Active</span>`
+        : `<span class="badge badge-gray">Archived</span>`;
+      const errCount = v.validationSummary?.errors || 0;
+      const errBadge = errCount
+        ? `<span class="badge badge-red">${errCount}</span>`
+        : `<span class="badge badge-green">0</span>`;
+
+      return `<tr>
+        <td><span class="badge badge-blue" style="font-weight:800">v${v.version}</span></td>
+        <td style="font-size:.82rem;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${Utils.escapeHtml(v.fileName||'')}">
+          ${Utils.escapeHtml(v.fileName || '—')}
+        </td>
+        <td>${Utils.escapeHtml(v.uploadedBy || '—')}</td>
+        <td style="font-size:.8rem;white-space:nowrap">${Utils.formatDateTime(v.uploadedAt)}</td>
+        <td style="font-weight:600">${Utils.formatNumber(v.recordCount || 0)}</td>
+        <td>${errBadge}</td>
+        <td>${activeBadge}</td>
+        <td style="font-family:monospace;font-size:.7rem;color:var(--text-muted)">${(v.hash||'').slice(0,14)}…</td>
+        <td>
+          <div style="display:flex;gap:6px">
+            ${!v.isActive ? `
+            <button class="btn btn-outline btn-sm" onclick="restoreVersion('${v.id}')"
+                    title="Restore this version">
+              <i class="fa-solid fa-rotate-left"></i> Restore
+            </button>` : `<span style="font-size:.78rem;color:var(--accent-green);font-weight:600">
+              <i class="fa-solid fa-check"></i> Current
+            </span>`}
+            <button class="btn btn-ghost btn-sm" onclick="previewVersion('${v.id}')"
+                    title="Preview records">
+              <i class="fa-solid fa-eye"></i>
+            </button>
+            ${!v.isActive ? `
+            <button class="btn btn-ghost btn-sm" style="color:var(--accent-red)"
+                    onclick="deleteVersion('${v.id}')" title="Delete version">
+              <i class="fa-solid fa-trash"></i>
+            </button>` : ''}
+          </div>
+        </td>
+      </tr>`;
+    }).join('');
+  }
+
+  /* ── Restore version ─────────────────────────────────────── */
+  window.restoreVersion = async (id) => {
+    const ver = await Database.get('versionHistory', id);
+    if (!ver) return;
+    const ok = await App.Modal.confirm({
+      title:       'Restore Version',
+      message:     `Restore HR database to v${ver.version} (${Utils.formatNumber(ver.recordCount)} records from ${Utils.formatDate(ver.uploadedAt)})? The current active version will be archived.`,
+      confirmText: 'Restore',
+      confirmClass:'btn-primary'
+    });
+    if (!ok) return;
+    App.Loader.show('Restoring version…');
+    try {
+      const result = await HR.restoreVersion(id);
+      await Audit.log({
+        module: 'HR', action: 'Restore', status: 'success',
+        detail: `Restored to v${result.version} (${result.recordCount} records)`
+      });
+      App.Toast.success('Restored', `HR database restored to v${result.version}.`);
+      await loadActiveVersionInfo();
+    } catch (err) {
+      App.Toast.error('Restore Failed', err.message);
+    } finally {
+      App.Loader.hide();
+    }
+  };
+
+  /* ── Preview version records ─────────────────────────────── */
+  window.previewVersion = async (id) => {
+    App.Loader.show('Decrypting version data…');
+    try {
+      const records = await HR.getVersionRecords(id);
+      const ver     = await Database.get('versionHistory', id);
+      App.Loader.hide();
+
+      const rows = records.slice(0, 100).map(r => `<tr>
+        <td style="font-weight:600;font-size:.82rem">${Utils.escapeHtml(r.employeeId||'—')}</td>
+        <td>${Utils.escapeHtml(r.employeeName||'—')}</td>
+        <td style="font-family:monospace;font-size:.78rem">${Utils.escapeHtml(r.bankAccountNumber||'—')}</td>
+        <td style="font-family:monospace;font-size:.78rem">${Utils.escapeHtml(r.ifsc||'—')}</td>
+        <td style="font-size:.78rem">${Utils.escapeHtml(r.nameInBank||'—')}</td>
+        <td style="font-size:.78rem">${Utils.escapeHtml(r.branch||'—')}</td>
+      </tr>`).join('');
+
+      App.Modal.create({
+        title: `Preview — HR v${ver?.version || '?'} (first 100 records)`,
+        size:  'xl',
+        body:  `<div class="table-wrap" style="max-height:480px;overflow-y:auto">
+          <table class="data-table">
+            <thead><tr><th>Emp ID</th><th>Name</th><th>Account No</th><th>IFSC</th><th>Name in Bank</th><th>Branch</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table></div>`
+      });
+    } catch (err) {
+      App.Loader.hide();
+      App.Toast.error('Preview Failed', err.message);
+    }
+  };
+
+  /* ── Delete version ──────────────────────────────────────── */
+  window.deleteVersion = async (id) => {
+    const ver = await Database.get('versionHistory', id);
+    if (!ver) return;
+    const ok = await App.Modal.confirm({
+      title:       'Delete Version',
+      message:     `Permanently delete HR v${ver.version}? This cannot be undone.`,
+      confirmText: 'Delete',
+      confirmClass:'btn-danger'
+    });
+    if (!ok) return;
+    try {
+      await HR.deleteVersion(id);
+      await Audit.log({ module:'HR', action:'DeleteVersion', status:'success', detail:`v${ver.version}` });
+      App.Toast.success('Deleted', `HR v${ver.version} removed.`);
+      await loadVersionHistory();
+    } catch (err) {
+      App.Toast.error('Delete Failed', err.message);
+    }
+  };
+
+  /* ── View Database Tab ───────────────────────────────────── */
+
+  async function loadViewTab() {
+    _viewRecords = await Database.getAll('hrMaster');
+    document.getElementById('view-record-count').textContent =
+      `${Utils.formatNumber(_viewRecords.length)} records`;
+    renderViewTable();
+  }
+
+  function renderViewTable(filter = '') {
+    const field  = document.getElementById('view-search-field').value;
+    let filtered = _viewRecords;
+    if (filter) {
+      const q = filter.toLowerCase();
+      filtered = filtered.filter(r => {
+        if (field === 'all') return Object.values(r).some(v => String(v).toLowerCase().includes(q));
+        return String(r[field] || '').toLowerCase().includes(q);
+      });
+    }
+
+    const total = filtered.length;
+    const pages = Math.ceil(total / PAGE_SIZE);
+    _viewPage   = Math.min(_viewPage, pages || 1);
+    const start = (_viewPage - 1) * PAGE_SIZE;
+    const slice = filtered.slice(start, start + PAGE_SIZE);
+
+    const tbody = document.getElementById('hr-view-tbody');
+    if (!slice.length) {
+      tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:40px;color:var(--text-muted)">
+        ${_viewRecords.length ? 'No records match your search' : 'No HR data loaded yet'}</td></tr>`;
+    } else {
+      tbody.innerHTML = slice.map((r, i) => `<tr>
+        <td style="color:var(--text-muted);font-size:.78rem">${start + i + 1}</td>
+        <td style="font-weight:700;font-family:monospace;font-size:.82rem">${Utils.escapeHtml(r.employeeId||'—')}</td>
+        <td>${Utils.escapeHtml(r.employeeName||'—')}</td>
+        <td style="font-size:.8rem">${Utils.escapeHtml(r.bankName||'—')}</td>
+        <td style="font-family:monospace;font-size:.78rem">${Utils.escapeHtml(r.bankAccountNumber||'—')}</td>
+        <td style="font-family:monospace;font-size:.78rem">${Utils.escapeHtml(r.ifsc||'—')}</td>
+        <td style="font-size:.8rem">${Utils.escapeHtml(r.nameInBank||'—')}</td>
+        <td style="font-size:.78rem">${Utils.escapeHtml(r.branch||'—')}</td>
+        <td style="font-size:.78rem">${Utils.escapeHtml(r.division||'—')}</td>
+        <td style="font-size:.78rem;color:var(--text-muted)">${Utils.escapeHtml(`${r.month||''}${r.year ? '/' + r.year : ''}`) || '—'}</td>
+      </tr>`).join('');
+    }
+
+    /* Pagination */
+    document.getElementById('view-pagination').innerHTML = total > PAGE_SIZE ? `
+      <span>${Utils.formatNumber(total)} records</span>
+      <div style="margin-left:auto;display:flex;gap:4px">
+        <button class="page-btn" ${_viewPage === 1 ? 'disabled' : ''} onclick="changePage('view',-1)">
+          <i class="fa-solid fa-chevron-left"></i>
+        </button>
+        <span style="display:flex;align-items:center;padding:0 10px;font-size:.8rem">
+          Page ${_viewPage} / ${pages}
+        </span>
+        <button class="page-btn" ${_viewPage >= pages ? 'disabled' : ''} onclick="changePage('view',1)">
+          <i class="fa-solid fa-chevron-right"></i>
+        </button>
+      </div>` : `<span>${Utils.formatNumber(total)} records</span>`;
+  }
+
+  document.getElementById('hr-view-search').addEventListener('input', Utils.debounce(e => {
+    _viewPage = 1; renderViewTable(e.target.value);
+  }));
+  document.getElementById('view-search-field').addEventListener('change', () => {
+    _viewPage = 1; renderViewTable(document.getElementById('hr-view-search').value);
+  });
+
+  /* ── Export HR data ─────────────────────────────────────── */
+  document.getElementById('export-hr-btn').addEventListener('click', async () => {
+    App.Loader.show('Generating Excel export…');
+    try {
+      await HR.exportToExcel();
+      App.Toast.success('Exported', 'HR data downloaded as Excel.');
+    } catch (err) {
+      App.Toast.error('Export Failed', err.message);
+    } finally {
+      App.Loader.hide();
+    }
+  });
+
+  /* ── Load view when tab clicked ─────────────────────────── */
+  document.querySelector('[data-tab="view"]').addEventListener('click', loadViewTab);
+  document.querySelector('[data-tab="versions"]').addEventListener('click', loadVersionHistory);
+
+  /* ── Step bar helper ─────────────────────────────────────── */
+  function setStep(n) {
+    _currentStep = n;
+    for (let i = 1; i <= 4; i++) {
+      const stepEl = document.getElementById(`step${i}`);
+      const lineEl = document.getElementById(`line${i}`);
+      stepEl.className = 'step' + (i < n ? ' done' : i === n ? ' active' : '');
+      if (stepEl.querySelector('.step-num')) {
+        stepEl.querySelector('.step-num').innerHTML = i < n ? '<i class="fa-solid fa-check"></i>' : i;
+      }
+      if (lineEl) lineEl.className = 'step-line' + (i < n ? ' done' : '');
+    }
+  }
+
+  /* ── Audit log ──────────────────────────────────────────── */
+  await Audit.log({ module: 'HR', action: 'PageView', status: 'success' });
+
+})();
+</script>
+
+</body>
+</html>
