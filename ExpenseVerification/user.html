@@ -268,9 +268,12 @@
           <div class="card">
             <div class="card-header">
               <div class="card-title"><i class="fa-solid fa-clipboard-check"></i> Approval Details</div>
-              <button class="btn btn-primary btn-sm" id="btn-verify-zoho-top" style="display:none">
-                <i class="fa-solid fa-shield-check"></i> Verify
-              </button>
+              <div style="display:flex;align-items:center;gap:8px">
+                <span id="zoho-no-record" style="display:none;font-size:.8rem;color:var(--accent-red);font-weight:600"><i class="fa-solid fa-circle-xmark"></i> No employee record found</span>
+                <button class="btn btn-primary btn-sm" id="btn-verify-zoho-top" style="display:none">
+                  <i class="fa-solid fa-shield-check"></i> Verify
+                </button>
+              </div>
             </div>
             <div class="card-body" id="approval-panel">
               <div class="empty-state" style="padding:30px 0">
@@ -390,6 +393,11 @@
               <button class="btn btn-ghost" id="btn-clear-search">Clear</button>
             </div>
           </div>
+        </div>
+
+        <!-- DB validation messages (shown when emp IDs missing from one or both DBs) -->
+        <div id="db-validation-messages" style="display:none;margin-bottom:16px">
+          <div style="display:flex;flex-direction:column;gap:8px" id="db-validation-inner"></div>
         </div>
 
         <!-- Generate Expense panel (shown when all verified emp IDs found in both DBs) -->
@@ -656,7 +664,11 @@
         document.getElementById('pdf-verify-section').style.display = 'block';
         document.getElementById('pdf-emp-count').textContent = `${zohoTask.empIds.length} emp ID(s)`;
       }
-      showVerifyButtons(zohoTask.empIds.length > 0);
+      const hasEmps = zohoTask.empIds.length > 0;
+      showVerifyButtons(hasEmps);
+      if (!hasEmps) {
+        App.Toast.warning('No Employees', 'No employee IDs found in this Zoho task.');
+      }
 
       App.Toast.success('Task Found', ZohoProjects.getSummary(zohoTask));
       await Audit.log({ module: 'Zoho', action: 'FetchTask', status: 'success', detail: `Task ${taskId}: ${zohoTask.approvalStatus}` });
@@ -680,17 +692,48 @@
       const el = document.getElementById(id);
       if (el) el.style.display = show ? '' : 'none';
     });
+    const noRec = document.getElementById('zoho-no-record');
+    if (noRec) noRec.style.display = show ? 'none' : '';
   }
 
-  /* ── Verify from Zoho → switch to Search tab, auto-search ── */
+  /* ── Verify from Zoho → switch to Search tab, search all emp IDs in both DBs ── */
   async function doVerifyFromZoho() {
     if (!zohoTask || !zohoTask.empIds.length) return;
-    zohoVerifyMode = true;
-    verifyEmpIds   = zohoTask.empIds;
-    document.getElementById('search-field').value      = 'empId';
-    document.getElementById('global-emp-search').value = zohoTask.empIds[0];
-    document.querySelector('.tab-btn[data-tab="search"]').click();
-    await doSearch();
+
+    const btnTop    = document.getElementById('btn-verify-zoho-top');
+    const btnBottom = document.getElementById('btn-verify-zoho-bottom');
+    [btnTop, btnBottom].forEach(b => { if (b) { b.disabled = true; b.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Verifying…'; } });
+
+    try {
+      zohoVerifyMode = true;
+      verifyEmpIds   = zohoTask.empIds;
+
+      // Switch to Search tab
+      document.querySelector('.tab-btn[data-tab="search"]').click();
+
+      // Show search field populated with first ID for reference
+      document.getElementById('search-field').value      = 'empId';
+      document.getElementById('global-emp-search').value = zohoTask.empIds.join(', ');
+
+      App.Loader.show('Searching databases…');
+
+      // Search all emp IDs across both DBs
+      const allResults = [];
+      for (const id of zohoTask.empIds) {
+        const res = await Verification.searchEmployees(id, 'empId');
+        for (const r of res) {
+          if (!allResults.find(x => x.source === r.source && x.empId === r.empId)) allResults.push(r);
+        }
+      }
+      searchResults = allResults;
+      renderSearchResults(searchResults);
+      await checkGenerateExpense();
+    } catch (e) {
+      App.Toast.error('Verify Failed', e.message);
+    } finally {
+      App.Loader.hide();
+      [btnTop, btnBottom].forEach(b => { if (b) { b.disabled = false; b.innerHTML = '<i class="fa-solid fa-shield-check"></i> Verify'; } });
+    }
   }
 
   document.getElementById('btn-verify-zoho-top').addEventListener('click',    doVerifyFromZoho);
@@ -1247,17 +1290,34 @@
 
   /* ── Check if all zoho emp IDs are found in both DBs ───── */
   async function checkGenerateExpense() {
-    const section = document.getElementById('generate-expense-section');
+    const section    = document.getElementById('generate-expense-section');
+    const valMsgs    = document.getElementById('db-validation-messages');
+    const valInner   = document.getElementById('db-validation-inner');
     if (!section) return;
-    if (!zohoVerifyMode || !verifyEmpIds.length) { section.style.display = 'none'; return; }
+    if (!zohoVerifyMode || !verifyEmpIds.length) {
+      section.style.display  = 'none';
+      if (valMsgs) valMsgs.style.display = 'none';
+      return;
+    }
 
     const hrAll  = await Database.getAll('hrMaster');
     const accAll = await Database.getAll('accountsMaster');
     const hrMap  = new Map(hrAll.map(r  => [r.employeeId?.toUpperCase(), r]));
     const accMap = new Map(accAll.map(r => [r.empCode?.toUpperCase(), r]));
 
-    const allFound = verifyEmpIds.every(id => hrMap.has(id.toUpperCase()) && accMap.has(id.toUpperCase()));
+    const missingHR  = verifyEmpIds.filter(id => !hrMap.has(id.toUpperCase()));
+    const missingAcc = verifyEmpIds.filter(id => !accMap.has(id.toUpperCase()));
+    const allFound   = missingHR.length === 0 && missingAcc.length === 0;
+
     section.style.display = allFound ? '' : 'none';
+
+    if (valMsgs && valInner) {
+      const msgs = [];
+      if (missingHR.length)  msgs.push(`<div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:#fde7e9;border:1px solid #f5c6cb;border-radius:8px;font-size:.85rem;color:#8a0008"><i class="fa-solid fa-circle-xmark" style="color:#c0392b;font-size:1rem"></i><span><strong>Employee not found in AES Payroll Database:</strong> ${missingHR.map(id => `<code style="background:rgba(0,0,0,.08);padding:1px 5px;border-radius:4px">${Utils.escapeHtml(id)}</code>`).join(', ')}</span></div>`);
+      if (missingAcc.length) msgs.push(`<div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:#fde7e9;border:1px solid #f5c6cb;border-radius:8px;font-size:.85rem;color:#8a0008"><i class="fa-solid fa-circle-xmark" style="color:#c0392b;font-size:1rem"></i><span><strong>Employee not found in Bank Advise Database:</strong> ${missingAcc.map(id => `<code style="background:rgba(0,0,0,.08);padding:1px 5px;border-radius:4px">${Utils.escapeHtml(id)}</code>`).join(', ')}</span></div>`);
+      valInner.innerHTML     = msgs.join('');
+      valMsgs.style.display  = msgs.length ? '' : 'none';
+    }
   }
 
   /* ── Generate SAL or NAS expense file ──────────────────── */
@@ -1308,7 +1368,7 @@
       });
       a.click();
       URL.revokeObjectURL(url);
-      App.Toast.success('Downloaded', `${forceType} expense file — ${rows.length} record(s).`);
+      App.Toast.success('Expense file generated successfully.', 'Download has started.');
     } catch (err) {
       App.Toast.error('Failed', err.message);
     } finally {
@@ -1515,6 +1575,10 @@
     document.getElementById('global-emp-search').value = urlSearch;
     await doSearch();
   }
+
+  /* ── Initial state ─────────────────────────────────────── */
+  const _noRec = document.getElementById('zoho-no-record');
+  if (_noRec) _noRec.style.display = 'none';
 
   /* ── Initial mode ───────────────────────────────────────── */
   setApprovalMode('zoho');
