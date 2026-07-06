@@ -466,7 +466,7 @@
     let list = users;
     if (q) list = list.filter(u =>
       u.username.toLowerCase().includes(q) ||
-      (u.displayName || '').toLowerCase().includes(q) ||
+      (u.display_name || '').toLowerCase().includes(q) ||
       (u.department  || '').toLowerCase().includes(q));
     if (roleFilter) list = list.filter(u => u.role === roleFilter);
 
@@ -483,11 +483,11 @@
         : `<span class="badge" style="background:var(--bg);color:var(--text-muted);border:1px solid var(--border)">Inactive</span>`;
       return `<tr>
         <td><strong>${Utils.escapeHtml(u.username)}</strong></td>
-        <td>${Utils.escapeHtml(u.displayName || '—')}</td>
+        <td>${Utils.escapeHtml(u.display_name || '—')}</td>
         <td><span class="role-badge role-${u.role}">${Utils.escapeHtml(ri.label)}</span></td>
         <td>${Utils.escapeHtml(u.department || '—')}</td>
         <td>${statusBadge}</td>
-        <td style="font-size:.8rem;white-space:nowrap">${Utils.formatDate(u.createdAt)}</td>
+        <td style="font-size:.8rem;white-space:nowrap">${Utils.formatDate(u.created_at)}</td>
         <td>
           <div style="display:flex;gap:6px">
             <button class="btn btn-ghost btn-sm btn-icon" onclick="editUser('${u.id}')" title="Edit"><i class="fa-solid fa-pen"></i></button>
@@ -513,7 +513,7 @@
   window.toggleUser = async (id, cur) => {
     const u = await Database.get('users', id); if (!u) return;
     u.status = cur === 'active' ? 'inactive' : 'active';
-    await Database.put('users', u);
+    await Auth.adminUpdateUser(id, { status: u.status });
     await Audit.log({ module:'Admin', action:'ToggleUser', status:'success', detail:`${u.username} → ${u.status}` });
     App.Toast.success('Updated', `${u.username} is now ${u.status}.`);
     loadUsers();
@@ -539,7 +539,7 @@
         </div>
         <div class="form-group">
           <label class="form-label">Display Name</label>
-          <input type="text" class="form-control" id="m-displayname" value="${Utils.escapeHtml(user?.displayName||'')}" placeholder="John Smith">
+          <input type="text" class="form-control" id="m-displayname" value="${Utils.escapeHtml(user?.display_name||'')}" placeholder="John Smith">
         </div>
         <div class="form-group">
           <label class="form-label">Role <span style="color:var(--accent-red)">*</span></label>
@@ -589,14 +589,25 @@
         }
       }
 
-      const salt     = user?.salt || Utils.uuid();
-      const passHash = password ? CryptoJS.SHA256(password + salt).toString() : user?.passwordHash;
-      const record   = { id: user?.id || Utils.uuid(), username, displayName, role, department, status, salt, passwordHash: passHash, createdAt: user?.createdAt || new Date().toISOString(), createdBy: user?.createdBy || sess.username, updatedAt: new Date().toISOString() };
-
-      await Database.put('users', record);
-      await Audit.log({ module:'Admin', action: isEdit?'UpdateUser':'CreateUser', status:'success', detail: username });
-      App.Toast.success('Success', `User ${username} ${isEdit?'updated':'created'}.`);
-      close(); loadUsers();
+      try {
+        if (isEdit) {
+          const updates = { display_name: displayName, role, department, status };
+          await Auth.adminUpdateUser(user.id, updates);
+          if (password) await Auth.changePassword(password);
+        } else {
+          const email = `${username.toLowerCase()}@expenseverify.local`;
+          await Auth.adminCreateUser({ username, email, password, role, displayName });
+          await Auth.adminUpdateUser(
+            (await Database.getAll('users')).find(u => u.username === username)?.id,
+            { department, status }
+          );
+        }
+        await Audit.log({ module:'Admin', action: isEdit?'UpdateUser':'CreateUser', status:'success', detail: username });
+        App.Toast.success('Success', `User ${username} ${isEdit?'updated':'created'}.`);
+        close(); loadUsers();
+      } catch(err) {
+        App.Toast.error('Error', err.message);
+      }
     });
   }
 
@@ -616,7 +627,7 @@
     const status = document.getElementById('audit-status-filter').value;
 
     const list = allLogs.filter(l =>
-      (!q      || l.user.toLowerCase().includes(q) || l.module.toLowerCase().includes(q) || l.action.toLowerCase().includes(q) || (l.detail||'').toLowerCase().includes(q)) &&
+      (!q      || (l.username||'').toLowerCase().includes(q) || l.module.toLowerCase().includes(q) || l.action.toLowerCase().includes(q) || (l.detail||'').toLowerCase().includes(q)) &&
       (!mod    || l.module === mod) &&
       (!status || l.status === status)
     );
@@ -626,9 +637,9 @@
     const statusMap = { success:'badge-green', error:'badge-red', warning:'badge-yellow' };
     const tbody = document.getElementById('audit-tbody');
     tbody.innerHTML = list.length ? list.map(l => `<tr>
-      <td style="white-space:nowrap;font-size:.78rem">${Utils.formatDateTime(l.date)}</td>
-      <td><strong>${Utils.escapeHtml(l.user)}</strong></td>
-      <td><span class="role-badge role-${l.role}" style="font-size:.7rem">${Utils.escapeHtml(Auth.ROLES[l.role]?.label || l.role)}</span></td>
+      <td style="white-space:nowrap;font-size:.78rem">${Utils.formatDateTime(l.created_at)}</td>
+      <td><strong>${Utils.escapeHtml(l.username)}</strong></td>
+      <td></td>
       <td>${Utils.escapeHtml(l.module)}</td>
       <td>${Utils.escapeHtml(l.action)}</td>
       <td><span class="badge ${statusMap[l.status]||'badge-blue'}">${Utils.escapeHtml(l.status)}</span></td>
@@ -645,7 +656,7 @@
     if (!allLogs.length) { App.Toast.warning('No Logs','No audit data loaded.'); return; }
     const header = 'Date,User,Role,Module,Action,Status,Detail';
     const rows   = allLogs.map(l => [
-      l.date, l.user, l.role, l.module, l.action, l.status,
+      l.created_at, l.username, '', l.module, l.action, l.status,
       `"${(l.detail||'').replace(/"/g,'""')}"`,
     ].join(','));
     Utils.downloadBlob(new Blob([[header,...rows].join('\r\n')], {type:'text/csv'}),
