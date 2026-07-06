@@ -190,24 +190,15 @@
         <!-- ── Centre: Diagram ── -->
         <div style="flex:1;padding:8px 10px 6px;display:flex;flex-direction:column;align-items:center;gap:8px;min-width:0;overflow:hidden">
 
-          <!-- Cloud + Lock -->
-          <div style="text-align:center;position:relative">
-            <div style="position:relative;display:inline-flex;flex-direction:column;align-items:center">
-              <!-- Cloud shape -->
-              <div style="position:relative;width:80px;height:52px;filter:drop-shadow(0 0 22px rgba(120,190,255,.9))">
-                <svg viewBox="0 0 80 52" width="80" height="52" xmlns="http://www.w3.org/2000/svg">
-                  <defs>
-                    <linearGradient id="cloudG" x1="0%" y1="0%" x2="0%" y2="100%">
-                      <stop offset="0%" stop-color="#d0e8ff"/>
-                      <stop offset="100%" stop-color="#a0c8f0"/>
-                    </linearGradient>
-                  </defs>
-                  <path d="M62 38H20C12 38 6 32 6 24c0-7.7 6-14 14-14 1 0 2 .1 3 .4C25 5.4 31 2 38 2c10 0 18 7.4 18 16.6V19h6c5.5 0 10 4.3 10 9.5S67.5 38 62 38z" fill="url(#cloudG)" stroke="rgba(200,230,255,.6)" stroke-width=".8"/>
-                  <!-- Lock on cloud -->
-                  <rect x="34" y="20" width="12" height="10" rx="2" fill="#1a6fd4" opacity=".9"/>
-                  <path d="M37 20v-3a3 3 0 016 0v3" fill="none" stroke="#1a6fd4" stroke-width="2.2" stroke-linecap="round" opacity=".9"/>
-                  <circle cx="40" cy="25" r="1.4" fill="#fff" opacity=".85"/>
-                </svg>
+          <!-- App name -->
+          <div style="text-align:center;padding:4px 0 2px">
+            <div style="display:inline-flex;align-items:center;gap:10px">
+              <div style="width:38px;height:38px;background:linear-gradient(135deg,#1a56e8,#0ea5e9);border-radius:10px;display:flex;align-items:center;justify-content:center;box-shadow:0 0 18px rgba(30,100,255,.6),0 4px 12px rgba(0,0,0,.4)">
+                <i class="fa-solid fa-shield-check" style="font-size:1.1rem;color:#fff"></i>
+              </div>
+              <div style="text-align:left">
+                <div style="font-size:1.35rem;font-weight:800;letter-spacing:-.01em;line-height:1;color:#fff;text-shadow:0 0 20px rgba(100,180,255,.5)"><span style="color:#7EC8F7">Expense</span>Verify</div>
+                <div style="font-size:.65rem;color:rgba(255,255,255,.55);font-weight:500;margin-top:2px">Secure Expense Verification Platform</div>
               </div>
             </div>
           </div>
