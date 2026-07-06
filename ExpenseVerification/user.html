@@ -923,21 +923,21 @@
       : '';
 
     panel.innerHTML = `
-      <!-- ── Approval Source bar (horizontal) ── -->
-      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 14px;background:var(--bg);border:1px solid var(--border);border-radius:10px;margin-bottom:14px">
-        <span class="approval-pill ${statusClass}" style="padding:6px 14px">
+      <!-- ── Compact Approval Source bar ── -->
+      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:12px">
+        <span class="approval-pill ${statusClass}" style="padding:5px 12px;font-size:.82rem">
           <i class="fa-solid ${statusIcon}"></i> ${statusLabel}
         </span>
-        <span style="font-size:.75rem;padding:4px 10px;border-radius:var(--radius-pill);background:var(--bg-card,#fff);border:1px solid var(--border);color:var(--text-muted)">
-          <i class="fa-solid ${isZoho ? 'fa-link' : 'fa-file-pdf'}"></i> ${isZoho ? 'Zoho Task' : 'PDF'}
+        <span style="font-size:.72rem;padding:3px 8px;border-radius:var(--radius-pill);background:var(--bg);border:1px solid var(--border);color:var(--text-muted)">
+          <i class="fa-solid ${isZoho ? 'fa-link' : 'fa-file-pdf'}"></i> ${isZoho ? 'Zoho' : 'PDF'}
         </span>
         ${evidenceSources.map(srcBadge).join('')}
       </div>
 
       <!-- ── Approval Details grid ── -->
-      <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:2px">
-        <div style="padding:9px 14px;background:var(--bg);border-bottom:1px solid var(--border);font-size:.8rem;font-weight:700;color:var(--text-muted);letter-spacing:.05em">APPROVAL DETAILS</div>
-        <div style="padding:10px 14px">
+      <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:14px">
+        <div style="padding:7px 14px;background:var(--bg);border-bottom:1px solid var(--border);font-size:.74rem;font-weight:700;color:var(--text-muted);letter-spacing:.05em">APPROVAL DETAILS</div>
+        <div style="padding:8px 14px">
           <table style="border-collapse:collapse;width:100%">
             ${detailRow('Task / Ref',   taskRef   ? `<span style="font-family:var(--font-mono);font-weight:600">${Utils.escapeHtml(taskRef)}</span>` : '')}
             ${detailRow('Task Name',    taskLabel  ? Utils.escapeHtml(taskLabel)  : '')}
@@ -950,9 +950,9 @@
             ${detailRow('Amounts',      amounts.length? amounts.map(a => Utils.formatCurrency(a)).join(' · ')   : '')}
             ${detailRow('Pages',        pageCount != null ? String(pageCount) : '')}
             <tr>
-              <td style="padding:5px 12px 5px 0;font-size:.74rem;color:var(--text-muted);font-weight:700;white-space:nowrap;vertical-align:top;text-transform:uppercase;letter-spacing:.04em">Emp IDs</td>
-              <td style="padding:5px 0;vertical-align:top">
-                <div style="display:flex;flex-wrap:wrap;gap:5px">
+              <td style="padding:4px 12px 4px 0;font-size:.74rem;color:var(--text-muted);font-weight:700;white-space:nowrap;vertical-align:top;text-transform:uppercase;letter-spacing:.04em">Emp IDs</td>
+              <td style="padding:4px 0;vertical-align:top">
+                <div style="display:flex;flex-wrap:wrap;gap:4px">
                   ${empIds.length
                     ? empIds.map(id => `<span class="badge badge-blue">${Utils.escapeHtml(id)}</span>`).join('')
                     : '<span style="font-size:.8rem;color:var(--text-muted)">None detected</span>'}
@@ -963,6 +963,7 @@
         </div>
       </div>
 
+      <!-- ── Comments (below details) ── -->
       ${commentsHtml}
       ${attachmentsHtml}`;
   }

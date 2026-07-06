@@ -260,34 +260,33 @@ const ZohoProjects = (() => {
     });
   }
 
-  /* ── Resolve display ID (e.g. "S07-T1") → numeric task ──── */
+  /* ── Resolve display ID in parallel across all projects ──── */
   async function resolveDisplayId(displayId) {
     const upper = displayId.toUpperCase();
 
     const projData = await apiGet(`/portal/${enc(PORTAL_NAME)}/projects/`);
     const projects  = projData.projects || [];
+    console.debug(`[Zoho] Searching ${projects.length} projects (parallel) for "${displayId}"`);
 
-    console.debug(`[Zoho] Searching ${projects.length} projects for task "${displayId}"`);
+    // Try projects in parallel batches of 6 to avoid rate-limiting
+    const BATCH = 6;
+    for (let i = 0; i < projects.length; i += BATCH) {
+      const batch = projects.slice(i, i + BATCH);
 
-    for (const project of projects) {
-      const projectId  = project.id_string || project.id;
-      const projPrefix = (project.prefix || project.key || project.name || '').toUpperCase();
+      // Race all projects in the batch; first match wins
+      const result = await Promise.any(
+        batch.map(async project => {
+          const projectId  = project.id_string || project.id;
+          const projPrefix = (project.prefix || project.key || project.name || '').toUpperCase();
+          const tasks = await fetchAllTasks(projectId);
+          const match = matchTask(tasks, upper, projPrefix);
+          if (!match) throw new Error('not found');
+          if (!match.project) match.project = { id_string: projectId, name: project.name };
+          return { task: match, projectId };
+        })
+      ).catch(() => null); // entire batch missed — move to next batch
 
-      let tasks = [];
-      try {
-        tasks = await fetchAllTasks(projectId);
-        if (tasks.length) {
-          console.debug(`[Zoho] Project "${project.name}" (prefix="${projPrefix}"): ${tasks.length} tasks. ALL keys:`,
-            tasks.map(t => t.key || t.task_key || (t.sequence_num ? `seq:${t.sequence_num}` : '?'))
-          );
-        }
-      } catch { continue; }
-
-      const match = matchTask(tasks, upper, projPrefix);
-      if (match) {
-        if (!match.project) match.project = { id_string: projectId, name: project.name };
-        return { task: match, projectId };
-      }
+      if (result) return result;
     }
 
     throw new Error(`Task "${displayId}" not found. Checked ${projects.length} project(s).`);
