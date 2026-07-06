@@ -10,15 +10,11 @@ const Audit = (() => {
     try {
       const sess = Auth.getCurrentUser?.() || {};
       const entry = {
-        id:        Utils.uuid(),
-        date:      new Date().toISOString(),
-        user:      sess.username || 'system',
-        role:      sess.role     || 'system',
+        username: sess.username || 'system',
         module,
         action,
         status,
         detail,
-        browser:   navigator.userAgent.split(' ').slice(-1)[0] || 'Unknown'
       };
       await Database.add('auditLogs', entry);
     } catch (err) {
