@@ -8,4 +8,4 @@ compatibility_date = "2024-09-23"
 [[d1_databases]]
 binding = "DB"
 database_name = "evs-db"
-database_id = "00000000-0000-0000-0000-000000000000"
+database_id = "237485dc-7cf4-43a5-bc9d-88ea3143b55b"
