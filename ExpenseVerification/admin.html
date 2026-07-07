@@ -414,8 +414,6 @@
 
 <!-- ── Scripts ──────────────────────────────────────────────── -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/supabase-client.js"></script>
 <script src="js/utils.js"></script>
 <script src="js/database.js"></script>
 <script src="js/auth.js"></script>
@@ -597,14 +595,10 @@
       try {
         if (isEdit) {
           const updates = { display_name: displayName, role, department, status };
+          if (password) updates.password = password;
           await Auth.adminUpdateUser(user.id, updates);
-          if (password) await Auth.changePassword(password);
         } else {
-          await Auth.adminCreateUser({ username, password, role, displayName });
-          await Auth.adminUpdateUser(
-            (await Database.getAll('users')).find(u => u.username === username)?.id,
-            { department, status }
-          );
+          await Auth.adminCreateUser({ username, password, role, displayName, department, status });
         }
         await Audit.log({ module:'Admin', action: isEdit?'UpdateUser':'CreateUser', status:'success', detail: username });
         App.Toast.success('Success', `User ${username} ${isEdit?'updated':'created'}.`);

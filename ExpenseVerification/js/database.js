@@ -1,11 +1,11 @@
 /**
- * database.js — Supabase backend replacing IndexedDB
- * All data is now stored centrally and shared across all users/devices.
+ * database.js — Cloudflare D1 (via Pages Functions) backend.
+ * All data is stored centrally and shared across all users/devices.
  */
 
 const Database = (() => {
 
-  /* ── Table name map (store name → Supabase table) ─────── */
+  /* ── Table name map (store name → API/D1 table) ────────── */
   const TABLE = {
     users:           'profiles',
     hrMaster:        'hr_master',
@@ -17,86 +17,87 @@ const Database = (() => {
     accountsBatches: 'accounts_batches',
   };
 
-  function sb() { return getSupabase(); }
   function tbl(store) {
-    const t = TABLE[store];
-    if (!t) throw new Error(`Unknown store: ${store}`);
-    return t;
+    if (!TABLE[store]) throw new Error(`Unknown store: ${store}`);
+    return store; // the API is keyed by store name, not the raw table name
+  }
+
+  async function apiFetch(path, opts = {}) {
+    const res = await fetch(path, {
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      ...opts,
+    });
+    let body = null;
+    try { body = await res.json(); } catch { /* no body */ }
+    if (!res.ok) throw new Error(body?.error || `Request failed (${res.status})`);
+    return body;
   }
 
   /* ── Generic helpers ────────────────────────────────────── */
   async function getAll(store) {
-    const { data, error } = await sb().from(tbl(store)).select('*');
-    if (error) throw new Error(error.message);
+    const { data } = await apiFetch(`/api/data/${tbl(store)}`);
     return data || [];
   }
 
   async function get(store, key) {
-    const { data, error } = await sb().from(tbl(store)).select('*').eq('id', key).maybeSingle();
-    if (error) throw new Error(error.message);
+    const { data } = await apiFetch(`/api/data/${tbl(store)}/${encodeURIComponent(key)}`);
     return data;
   }
 
   async function getByIndex(store, indexName, value) {
-    const { data, error } = await sb().from(tbl(store)).select('*').eq(indexName, value);
-    if (error) throw new Error(error.message);
+    const qs = new URLSearchParams({ index: indexName, value }).toString();
+    const { data } = await apiFetch(`/api/data/${tbl(store)}?${qs}`);
     return data || [];
   }
 
   async function add(store, record) {
-    const { data, error } = await sb().from(tbl(store)).insert(record).select().single();
-    if (error) throw new Error(error.message);
+    const { data } = await apiFetch(`/api/data/${tbl(store)}`, { method: 'POST', body: JSON.stringify(record) });
     return data;
   }
 
   async function put(store, record) {
-    // upsert: insert or update based on id
-    const { data, error } = await sb().from(tbl(store)).upsert(record).select().single();
-    if (error) throw new Error(error.message);
+    const { data } = await apiFetch(`/api/data/${tbl(store)}`, { method: 'PUT', body: JSON.stringify(record) });
     return data;
   }
 
   async function remove(store, key) {
-    const { error } = await sb().from(tbl(store)).delete().eq('id', key);
-    if (error) throw new Error(error.message);
+    await apiFetch(`/api/data/${tbl(store)}/${encodeURIComponent(key)}`, { method: 'DELETE' });
   }
 
   const del = remove;
 
   async function count(store) {
-    const { count: c, error } = await sb().from(tbl(store)).select('*', { count: 'exact', head: true });
-    if (error) throw new Error(error.message);
+    const { count: c } = await apiFetch(`/api/data/${tbl(store)}/count`);
     return c || 0;
   }
 
   async function clear(store) {
-    // Delete all rows — uses neq on a guaranteed column value to match all
-    const { error } = await sb().from(tbl(store)).delete().neq('id', '00000000-0000-0000-0000-000000000000');
-    if (error) throw new Error(error.message);
+    await apiFetch(`/api/data/${tbl(store)}`, { method: 'DELETE' });
   }
 
   async function bulkPut(store, records) {
     if (!records.length) return 0;
-    // Supabase upsert in chunks of 500
     const CHUNK = 500;
     for (let i = 0; i < records.length; i += CHUNK) {
       const chunk = records.slice(i, i + CHUNK);
-      const { error } = await sb().from(tbl(store)).upsert(chunk);
-      if (error) throw new Error(error.message);
+      await apiFetch(`/api/data/${tbl(store)}/bulk`, { method: 'POST', body: JSON.stringify(chunk) });
     }
     return records.length;
   }
 
   /* ── Settings helpers ───────────────────────────────────── */
   async function getSetting(key, defaultVal = null) {
-    const { data, error } = await sb().from('settings').select('value').eq('key', key).maybeSingle();
-    if (error || !data) return defaultVal;
-    return data.value;
+    try {
+      const { value } = await apiFetch(`/api/settings/${encodeURIComponent(key)}`);
+      return value ?? defaultVal;
+    } catch {
+      return defaultVal;
+    }
   }
 
   async function setSetting(key, value) {
-    const { error } = await sb().from('settings').upsert({ key, value, updated_at: new Date().toISOString() });
-    if (error) throw new Error(error.message);
+    await apiFetch(`/api/settings/${encodeURIComponent(key)}`, { method: 'PUT', body: JSON.stringify({ value }) });
   }
 
   /* ── Export / Import (backup) ───────────────────────────── */
@@ -117,7 +118,7 @@ const Database = (() => {
     }
   }
 
-  /* ── open() shim — no-op for Supabase (no connection needed) */
+  /* ── open() shim — no-op, no connection needed */
   async function open() { return true; }
 
   return {

@@ -5,9 +5,17 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "install-mcp": "npm install @modelcontextprotocol/sdk"
+    "install-mcp": "npm install @modelcontextprotocol/sdk",
+    "db:migrate": "wrangler d1 execute evs-db --file=schema.sql",
+    "db:seed": "wrangler d1 execute evs-db --file=seed.sql",
+    "db:migrate:local": "wrangler d1 execute evs-db --local --file=schema.sql",
+    "db:seed:local": "wrangler d1 execute evs-db --local --file=seed.sql",
+    "pages:dev": "wrangler pages dev . --d1=DB"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
   }
 }

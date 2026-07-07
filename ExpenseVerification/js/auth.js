@@ -1,5 +1,5 @@
 /**
- * auth.js — Authentication via Supabase Auth + profiles table
+ * auth.js — Authentication via Cloudflare D1 + Pages Functions (cookie sessions)
  * Employee Expense Verification System
  */
 
@@ -7,7 +7,7 @@ const Auth = (() => {
 
   const INACTIVITY_MS = 30 * 60 * 1000; // 30 minutes
   let _inactivityTimer = null;
-  let _profile = null; // cached profile {id, username, display_name, role}
+  let _profile = null; // cached profile {id, username, display_name, role, ...}
 
   /* ── Role definitions ───────────────────────────────────── */
   const ROLES = {
@@ -26,27 +26,25 @@ const Auth = (() => {
     'user.html':      ['admin', 'hr', 'accounts', 'user']
   };
 
-  function sb() { return getSupabase(); }
+  async function apiFetch(path, opts = {}) {
+    const res = await fetch(path, {
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      ...opts,
+    });
+    let body = null;
+    try { body = await res.json(); } catch { /* no body */ }
+    if (!res.ok) throw new Error(body?.error || `Request failed (${res.status})`);
+    return body;
+  }
 
   /* ── Login with username + password ────────────────────── */
   async function login(username, password, remember = false) {
-    // Look up email from profiles table by username
-    const { data: prof, error: profErr } = await sb()
-      .from('profiles')
-      .select('email, role, display_name, username')
-      .eq('username', username.trim())
-      .maybeSingle();
-
-    if (profErr) throw new Error('Profile lookup failed: ' + profErr.message);
-    if (!prof)   throw new Error('User not found. Check username spelling or contact admin.');
-
-    const { data, error } = await sb().auth.signInWithPassword({
-      email:    prof.email,
-      password: password,
+    const { profile } = await apiFetch('/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ username: username.trim(), password }),
     });
-    if (error) throw new Error('Auth error: ' + error.message + ' [' + error.status + ']');
-
-    _profile = { ...prof, id: data.user.id };
+    _profile = profile;
 
     if (remember) {
       localStorage.setItem('evs_remember', username.trim());
@@ -60,31 +58,27 @@ const Auth = (() => {
       await Audit.log({ module: 'Auth', action: 'Logout', status: 'success', detail: reason || 'User logged out' });
     } catch {}
     _profile = null;
-    await sb().auth.signOut();
+    try { await apiFetch('/api/auth/logout', { method: 'POST' }); } catch {}
     clearInactivityTimer();
     const q = reason ? `?reason=${encodeURIComponent(reason)}` : '';
     window.location.href = `login.html${q}`;
   }
 
-  /* ── Get current Supabase session ───────────────────────── */
+  /* ── Get current session's profile (also refreshes the cache) ── */
   async function getSessionAsync() {
-    const { data: { session } } = await sb().auth.getSession();
-    return session;
+    try {
+      const { profile } = await apiFetch('/api/auth/session');
+      _profile = profile;
+      return profile;
+    } catch {
+      return null;
+    }
   }
 
   /* ── Get current profile (cached) ──────────────────────── */
   async function fetchProfile() {
     if (_profile) return _profile;
-    const { data: { user } } = await sb().auth.getUser();
-    if (!user) return null;
-    const { data: prof } = await sb()
-      .from('profiles')
-      .select('username, display_name, role, email')
-      .eq('id', user.id)
-      .maybeSingle();
-    if (!prof) return null;
-    _profile = { ...prof, id: user.id };
-    return _profile;
+    return getSessionAsync();
   }
 
   /* ── Synchronous current user (from cache) ──────────────── */
@@ -99,11 +93,6 @@ const Auth = (() => {
 
   /* ── requireAuth — call at top of each protected page ───── */
   async function requireAuth(allowedRoles = null) {
-    const session = await getSessionAsync();
-    if (!session) {
-      window.location.href = 'login.html?reason=session_expired';
-      return false;
-    }
     const profile = await fetchProfile();
     if (!profile) {
       window.location.href = 'login.html?reason=session_expired';
@@ -118,8 +107,8 @@ const Auth = (() => {
 
   /* ── requireGuest — call on login page ──────────────────── */
   async function requireGuest() {
-    const session = await getSessionAsync();
-    if (session) {
+    const profile = await getSessionAsync();
+    if (profile) {
       window.location.href = 'dashboard.html';
       return false;
     }
@@ -170,55 +159,43 @@ const Auth = (() => {
     return localStorage.getItem('evs_remember') || '';
   }
 
-  /* ── Update profile ─────────────────────────────────────── */
+  /* ── Update own profile (display name / department only — role/status stay admin-only) ── */
   async function updateSessionUser(data) {
     if (!_profile) return;
-    const { error } = await sb().from('profiles').update(data).eq('id', _profile.id);
-    if (error) throw new Error(error.message);
+    await apiFetch('/api/auth/profile', { method: 'PATCH', body: JSON.stringify(data) });
     _profile = { ..._profile, ...data };
   }
 
   /* ── Admin: create user ─────────────────────────────────── */
-  // Login is by username, so email is only an internal identifier Supabase Auth
-  // requires — synthesize one instead of asking the admin to supply a real address.
-  async function adminCreateUser({ username, password, role, displayName }) {
-    // Create auth user via Supabase Admin (requires service role in a backend)
-    // For client-side: use sign-up then update profile
-    const email = `${username}@threedis.com`;
-    const { data, error } = await sb().auth.signUp({ email, password });
-    if (error) throw new Error(error.message);
-    const uid = data.user?.id;
-    if (!uid) throw new Error('User creation failed.');
-    const { error: profErr } = await sb().from('profiles').upsert({
-      id: uid, username, email, display_name: displayName, role,
+  // Login is by username; there's no real-email requirement at all anymore —
+  // Auth is now our own D1-backed users table, not Supabase.
+  async function adminCreateUser({ username, password, role, displayName, department, status }) {
+    const { id } = await apiFetch('/api/auth/users', {
+      method: 'POST',
+      body: JSON.stringify({ username, password, role, displayName, department, status }),
     });
-    if (profErr) throw new Error(profErr.message);
-    return uid;
+    return id;
   }
 
   /* ── Admin: list all users ──────────────────────────────── */
   async function getAllUsers() {
-    const { data, error } = await sb().from('profiles').select('*').order('username');
-    if (error) throw new Error(error.message);
-    return data || [];
+    const { users } = await apiFetch('/api/auth/users');
+    return (users || []).slice().sort((a, b) => a.username.localeCompare(b.username));
   }
 
   /* ── Admin: delete user ─────────────────────────────────── */
   async function adminDeleteUser(userId) {
-    const { error } = await sb().from('profiles').delete().eq('id', userId);
-    if (error) throw new Error(error.message);
+    await apiFetch(`/api/auth/users/${encodeURIComponent(userId)}`, { method: 'DELETE' });
   }
 
-  /* ── Admin: update user role / display name ─────────────── */
+  /* ── Admin: update user role / display name / password ──── */
   async function adminUpdateUser(userId, updates) {
-    const { error } = await sb().from('profiles').update(updates).eq('id', userId);
-    if (error) throw new Error(error.message);
+    await apiFetch(`/api/auth/users/${encodeURIComponent(userId)}`, { method: 'PATCH', body: JSON.stringify(updates) });
   }
 
-  /* ── Change password ────────────────────────────────────── */
+  /* ── Change own password ────────────────────────────────── */
   async function changePassword(newPassword) {
-    const { error } = await sb().auth.updateUser({ password: newPassword });
-    if (error) throw new Error(error.message);
+    await apiFetch('/api/auth/change-password', { method: 'POST', body: JSON.stringify({ newPassword }) });
   }
 
   return {
