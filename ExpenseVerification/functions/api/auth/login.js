@@ -1,4 +1,4 @@
-import { verifyPassword, createSession, sessionCookieHeader, isHttps } from '../_lib/auth.js';
+import { verifyPassword, createSession, sessionCookieHeader, isHttps, toCamelRow } from '../_lib/auth.js';
 
 export async function onRequestPost({ request, env }) {
   const { username, password } = await request.json();
@@ -17,7 +17,7 @@ export async function onRequestPost({ request, env }) {
   const token = await createSession(env, row.id);
   const { password_hash, password_salt, ...profile } = row;
 
-  return new Response(JSON.stringify({ profile }), {
+  return new Response(JSON.stringify({ profile: toCamelRow(profile) }), {
     status: 200,
     headers: { 'Content-Type': 'application/json', 'Set-Cookie': sessionCookieHeader(token, { secure: isHttps(request) }) },
   });

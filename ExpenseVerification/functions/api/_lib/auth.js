@@ -82,6 +82,17 @@ export async function destroySession(env, token) {
 
 const PROFILE_SAFE_COLUMNS = ['id', 'username', 'display_name', 'email', 'role', 'department', 'status', 'created_at'];
 
+// the frontend (admin.html, dashboard.html, ...) reads profile fields as
+// camelCase (sess.displayName), while SQL columns are snake_case.
+export function toCamelRow(row) {
+  if (!row) return row;
+  const out = {};
+  for (const [key, value] of Object.entries(row)) {
+    out[key.replace(/_([a-z0-9])/g, (_, c) => c.toUpperCase())] = value;
+  }
+  return out;
+}
+
 /** Resolve the logged-in profile (safe columns only) from the request's session cookie, or null. */
 export async function getSessionUser(request, env) {
   const token = parseCookies(request)[SESSION_COOKIE];
@@ -98,7 +109,7 @@ export async function getSessionUser(request, env) {
     return null;
   }
   delete row.expires_at;
-  return row;
+  return toCamelRow(row);
 }
 
 /** Require a logged-in user, optionally restricted to a set of roles. Returns { user } or { error: Response }. */

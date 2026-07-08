@@ -85,28 +85,25 @@ create table if not exists settings (
   updated_at text default (datetime('now'))
 );
 
+-- These three hold whatever arbitrary, module-defined object hr.js/
+-- accounts.js/verification.js choose to save (encrypted blobs, upload
+-- metadata, validation summaries, ...) rather than a fixed business
+-- schema, so the whole record is kept as one JSON blob (`data`) instead
+-- of mapped columns — see BLOB_TABLES in functions/api/_lib/db.js.
 create table if not exists verifications (
   id         text primary key,
-  created_by text,
-  source     text,
-  pdf_file   text,
-  summary    text,
-  results    text,
+  data       text not null,
   created_at text default (datetime('now'))
 );
 
 create table if not exists version_history (
   id         text primary key,
-  type       text,
-  version    text,
-  detail     text,
+  data       text not null,
   created_at text default (datetime('now'))
 );
 
 create table if not exists accounts_batches (
   id         text primary key,
-  batch_no   text,
-  is_active  integer default 0,
-  detail     text,
+  data       text not null,
   created_at text default (datetime('now'))
 );
