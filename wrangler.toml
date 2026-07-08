@@ -1,0 +1,15 @@
+name = "ai5"
+main = "worker/index.js"
+compatibility_date = "2024-09-23"
+
+[assets]
+directory = "."
+binding = "ASSETS"
+run_worker_first = true
+
+# Matches ExpenseVerification/wrangler.toml's D1 database — same evs-db,
+# same schema.sql/seed.sql apply to it.
+[[d1_databases]]
+binding = "DB"
+database_name = "evs-db"
+database_id = "237485dc-7cf4-43a5-bc9d-88ea3143b55b"
