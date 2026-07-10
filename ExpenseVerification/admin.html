@@ -311,6 +311,11 @@
                 <input type="number" class="form-control" id="max-versions" value="10" min="3" max="50">
                 <span class="form-hint">Older versions beyond this limit are auto-pruned.</span>
               </div>
+              <div class="form-group">
+                <label class="form-label">Zoho API Client ID</label>
+                <input type="text" class="form-control" id="zoho-client-id" placeholder="Client ID…" style="font-family:var(--font-mono)">
+                <span class="form-hint">Used by every user's Verification page to sign in to Zoho — set once here instead of per-browser. <a href="https://api-console.zoho.com/" target="_blank" rel="noopener">Get one at api-console.zoho.com</a></span>
+              </div>
               <button class="btn btn-primary" id="save-settings-btn">
                 <i class="fa-solid fa-floppy-disk"></i> Save Settings
               </button>
@@ -828,6 +833,7 @@
     document.getElementById('org-name').value        = await Database.getSetting('orgName',        '');
     document.getElementById('session-timeout').value = await Database.getSetting('sessionTimeout', 30);
     document.getElementById('max-versions').value    = await Database.getSetting('maxVersions',    10);
+    document.getElementById('zoho-client-id').value  = await Database.getSetting('zohoClientId',   '');
 
     const encKey = await Encryption.getAppKey();
     document.getElementById('app-enc-key').value = encKey;
@@ -848,6 +854,7 @@
     await Database.setSetting('orgName',        document.getElementById('org-name').value);
     await Database.setSetting('sessionTimeout', parseInt(document.getElementById('session-timeout').value) || 30);
     await Database.setSetting('maxVersions',    parseInt(document.getElementById('max-versions').value)    || 10);
+    await Database.setSetting('zohoClientId',   document.getElementById('zoho-client-id').value.trim());
     await Audit.log({ module:'Admin', action:'SaveSettings', status:'success' });
     App.Toast.success('Saved','Application settings updated.');
   });

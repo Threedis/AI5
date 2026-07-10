@@ -27,12 +27,9 @@ const ZohoProjects = (() => {
                         'ZohoProjects.tasklists.READ,ZohoProjects.projects.READ,' +
                         'ZohoProjects.comments.READ';
   const TOKEN_KEY     = 'zoho_token';
-  const CLIENT_ID_KEY = 'zoho_client_id';
 
-  /* ── Client ID (stored by user in localStorage) ─────────── */
-  function getClientId()   { return localStorage.getItem(CLIENT_ID_KEY) || ''; }
-  function setClientId(id) { localStorage.setItem(CLIENT_ID_KEY, id.trim()); }
-  function clearClientId() { localStorage.removeItem(CLIENT_ID_KEY); }
+  /* ── Client ID — set once by admin (Admin → Settings), shared by everyone ── */
+  async function getClientId() { return Database.getSetting('zohoClientId', ''); }
 
   /* ── Token management ────────────────────────────────────── */
   function getToken() {
@@ -69,9 +66,9 @@ const ZohoProjects = (() => {
   }
 
   /* ── Initiate OAuth redirect ─────────────────────────────── */
-  function connect() {
-    const clientId = getClientId();
-    if (!clientId) throw new Error('Enter your Zoho Client ID first.');
+  async function connect() {
+    const clientId = await getClientId();
+    if (!clientId) throw new Error('Zoho Client ID is not configured. Ask an admin to set it in Admin → Settings.');
     const redirectUri = location.href.split('#')[0].split('?')[0];
     const params = new URLSearchParams({
       response_type: 'token',
@@ -532,8 +529,6 @@ const ZohoProjects = (() => {
     disconnect,
     isConnected,
     getClientId,
-    setClientId,
-    clearClientId,
     fetchTask,
     fetchTaskComments,
     fetchTaskAttachments,

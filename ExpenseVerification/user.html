@@ -190,17 +190,6 @@
 
                   <!-- Not connected state -->
                   <div id="zoho-auth-disconnected" style="display:none">
-                    <!-- Client ID input (shown only if no client ID saved) -->
-                    <div id="zoho-clientid-row" style="display:none;padding:8px 12px;border-bottom:1px solid var(--border);background:var(--bg)">
-                      <div style="font-size:.75rem;color:var(--text-muted);margin-bottom:6px">
-                        Enter your Zoho API <strong>Client ID</strong> to enable Zoho sign-in.
-                        <a href="https://api-console.zoho.com/" target="_blank" rel="noopener" style="color:var(--primary)">Get one at api-console.zoho.com</a>
-                      </div>
-                      <div style="display:flex;gap:6px">
-                        <input type="text" id="zoho-client-id-input" class="form-control" placeholder="Client ID…" style="flex:1;font-size:.8rem;font-family:var(--font-mono)">
-                        <button id="btn-save-client-id" class="btn btn-outline btn-sm">Save</button>
-                      </div>
-                    </div>
                     <!-- Connect button -->
                     <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--bg)">
                       <span style="width:8px;height:8px;border-radius:50%;background:var(--accent-red);flex-shrink:0"></span>
@@ -607,7 +596,6 @@
   function refreshZohoAuthUI() {
     const connected    = document.getElementById('zoho-auth-connected');
     const disconnected = document.getElementById('zoho-auth-disconnected');
-    const clientIdRow  = document.getElementById('zoho-clientid-row');
     const searchBtn    = document.getElementById('btn-zoho-search');
 
     if (ZohoProjects.isConnected()) {
@@ -618,29 +606,19 @@
       connected.style.display    = 'none';
       disconnected.style.display = 'block';
       searchBtn.disabled = true;
-      // Show client ID input only when no client ID is stored yet
-      clientIdRow.style.display = ZohoProjects.getClientId() ? 'none' : 'block';
     }
   }
 
   refreshZohoAuthUI();
 
-  document.getElementById('btn-zoho-connect').addEventListener('click', () => {
-    try { ZohoProjects.connect(); }
+  document.getElementById('btn-zoho-connect').addEventListener('click', async () => {
+    try { await ZohoProjects.connect(); }
     catch (e) { App.Toast.error('Zoho Connect', e.message); }
   });
 
   document.getElementById('btn-zoho-disconnect').addEventListener('click', () => {
     ZohoProjects.disconnect();
     refreshZohoAuthUI();
-  });
-
-  document.getElementById('btn-save-client-id').addEventListener('click', () => {
-    const val = document.getElementById('zoho-client-id-input').value.trim();
-    if (!val) { App.Toast.warning('Client ID', 'Please enter a Client ID.'); return; }
-    ZohoProjects.setClientId(val);
-    refreshZohoAuthUI();
-    App.Toast.success('Client ID saved', 'Now click "Connect to Zoho" to authenticate.');
   });
 
   /* ── Zoho Task Search ───────────────────────────────────── */
