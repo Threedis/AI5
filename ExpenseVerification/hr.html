@@ -251,10 +251,10 @@
           <i class="fa-solid fa-circle-check"></i> Validation Report
           <span class="nav-badge" id="err-badge" style="display:none;background:var(--accent-red)">0</span>
         </button>
-        <button class="tab-btn" data-tab="versions">
+        <button class="tab-btn" data-tab="versions" id="tab-versions">
           <i class="fa-solid fa-code-branch"></i> Version History
         </button>
-        <button class="tab-btn" data-tab="view">
+        <button class="tab-btn" data-tab="view" id="tab-view">
           <i class="fa-solid fa-table"></i> View Database
           <span class="nav-badge" id="rec-count-badge" style="background:var(--primary)">0</span>
         </button>
@@ -828,7 +828,7 @@
       setStep(3);
 
       /* Switch to validation tab */
-      document.querySelector('[data-tab="validate"]').click();
+      document.getElementById('tab-validate').click();
 
       if (_validationResult.isValid) {
         App.Toast.success('Validation Passed',
@@ -1120,7 +1120,7 @@
       /* Refresh UI */
       await loadActiveVersionInfo();
       clearAll();
-      document.querySelector('[data-tab="versions"]').click();
+      document.getElementById('tab-versions').click();
 
     } catch (err) {
       console.error('[HR] Upload error:', err);
@@ -1349,8 +1349,8 @@
   });
 
   /* ── Load view when tab clicked ─────────────────────────── */
-  document.querySelector('[data-tab="view"]').addEventListener('click', loadViewTab);
-  document.querySelector('[data-tab="versions"]').addEventListener('click', loadVersionHistory);
+  document.getElementById('tab-view').addEventListener('click', loadViewTab);
+  document.getElementById('tab-versions').addEventListener('click', loadVersionHistory);
 
   /* ── Step bar helper ─────────────────────────────────────── */
   function setStep(n) {
