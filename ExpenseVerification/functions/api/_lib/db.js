@@ -181,8 +181,34 @@ export async function upsertRow(env, table, record) {
   return selectOne(env, table, encoded[pk]);
 }
 
+// A sequential loop of individual upsertRow() calls does two D1 round-trips
+// per record (insert + a read-back select) — for a few hundred HR/Accounts
+// rows that blows past the Workers subrequest cap and crashes with an
+// unhandled 500. Build every statement up front and send them in one
+// env.DB.batch() call instead: a single round-trip for the whole chunk.
 export async function bulkUpsert(env, table, records) {
-  for (const record of records) await upsertRow(env, table, record);
+  if (!records.length) return 0;
+  const pk = pkColumn(table);
+
+  const statements = records.map(record => {
+    if (BLOB_TABLES.has(table)) {
+      const withId = record.id ? record : { ...record, id: crypto.randomUUID() };
+      return env.DB.prepare(
+        `insert into ${table} (id, data) values (?, ?)
+         on conflict(id) do update set data = excluded.data`
+      ).bind(withId.id, JSON.stringify(withId));
+    }
+    const encoded = withGeneratedPk(table, encodeRecord(table, record), pk);
+    const cols = COLUMNS[table].filter(c => encoded[c] !== undefined);
+    const placeholders = cols.map(() => '?').join(',');
+    const updates = cols.filter(c => c !== pk).map(c => `${c} = excluded.${c}`).join(',');
+    return env.DB.prepare(
+      `insert into ${table} (${cols.join(',')}) values (${placeholders})
+       on conflict(${pk}) do update set ${updates}`
+    ).bind(...cols.map(c => encoded[c]));
+  });
+
+  await env.DB.batch(statements);
   return records.length;
 }
 
