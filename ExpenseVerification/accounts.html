@@ -544,13 +544,15 @@
 
       // Switch to report tab
       switchMainTab('preview');
+      const skippedCount = parseResults.reduce((sum, r) => sum + (r.skippedCount || 0), 0);
       App.Toast[validation.isValid ? 'success' : 'warning'](
         validation.isValid ? 'Validation Passed' : 'Validation Issues',
-        `${allRecords.length} records — ${validation.errors.length} error(s), ${validation.warnings.length} warning(s)`
+        `${allRecords.length} records — ${validation.errors.length} error(s), ${validation.warnings.length} warning(s)` +
+        (skippedCount ? `, ${skippedCount} skipped (HOLD/CHEQUE)` : '')
       );
 
       await Audit.log({ module: 'Accounts', action: 'FilesParsed', status: 'success',
-        detail: `${selectedFiles.length} file(s), ${allRecords.length} records, ${validation.errors.length} errors` });
+        detail: `${selectedFiles.length} file(s), ${allRecords.length} records, ${validation.errors.length} errors, ${skippedCount} skipped (HOLD/CHEQUE)` });
 
     } catch (err) {
       prog.style.display = 'none';

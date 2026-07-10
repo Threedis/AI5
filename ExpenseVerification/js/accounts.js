@@ -29,6 +29,9 @@ const Accounts = (() => {
   /* ── Section header keywords (HDFC, NEFT, HOLD, CHEQUE etc.) */
   const SECTION_KEYWORDS = ['hdfc', 'neft', 'hold', 'cheque', 'chq', 'others', 'other'];
 
+  /* ── Sections excluded entirely — never parsed into records ── */
+  const SKIP_SECTIONS = new Set(['HOLD', 'CHEQUE', 'CHQ']);
+
   /* ── Rows to skip (totals, cancelled, nil, etc.) ─────────── */
   const SKIP_PATTERNS = [
     /\bcancelled?\b/i, /\bcanceled\b/i,
@@ -123,10 +126,11 @@ const Accounts = (() => {
       }
     }
 
-    if (headerIdx < 0) return { records: [], colMap: {}, found: false };
+    if (headerIdx < 0) return { records: [], colMap: {}, found: false, skippedCount: 0 };
 
     // Parse data rows after header
     const records = [];
+    let skippedCount = 0; // records excluded because their section is HOLD/CHEQUE
     let currentSection = '';
     let skipNextNonBlank = false; // set after section header to skip its column-header row
 
@@ -187,6 +191,9 @@ const Accounts = (() => {
         }
       }
 
+      // Sections excluded entirely (HOLD/CHEQUE) — payments not going out this run
+      if (SKIP_SECTIONS.has(currentSection)) { skippedCount++; continue; }
+
       // Build keyed object for field extraction
       const obj = {};
       rawRow.forEach((v, idx) => { obj[idx] = v; });
@@ -214,7 +221,6 @@ const Accounts = (() => {
         designation: String(obj[colMap.designation]  ?? '').trim(),
         location:    String(obj[colMap.location]     ?? '').trim(),
         section:     currentSection,
-        isHold:      currentSection === 'HOLD',
         _sheet:      sheetName,
         _row:        i + 1,
       };
@@ -222,7 +228,7 @@ const Accounts = (() => {
       records.push(record);
     }
 
-    return { records, colMap, found: true };
+    return { records, colMap, found: true, skippedCount };
   }
 
   /* ── Detect format type: SAL or NES ─────────────────────── */
@@ -242,6 +248,7 @@ const Accounts = (() => {
     const format = detectFormat(workbook);
     const allRecords = [];
     const sheetResults = [];
+    let skippedCount = 0;
 
     for (const sheetName of workbook.SheetNames) {
       const ws = workbook.Sheets[sheetName];
@@ -249,9 +256,10 @@ const Accounts = (() => {
       const result = parseSheet(ws, sheetName);
       sheetResults.push({ sheetName, ...result });
       allRecords.push(...result.records);
+      skippedCount += result.skippedCount || 0;
     }
 
-    return { records: allRecords, format, fileName, sheetResults };
+    return { records: allRecords, format, fileName, sheetResults, skippedCount };
   }
 
   /* ── Validate records from all files ────────────────────── */
@@ -305,11 +313,6 @@ const Accounts = (() => {
       // Bank name (optional)
       if (!rec.bankName) {
         warnings.push({ row: idx + 1, field: 'bankName', type: 'MISSING_BANK_NAME', message: 'Bank name not provided', value: '', rowLabel });
-      }
-
-      // HOLD section — payment is pending release
-      if (rec.isHold) {
-        warnings.push({ row: idx + 1, field: 'section', type: 'PAYMENT_ON_HOLD', message: 'Employee payment is in HOLD section — release is pending', value: rec.empName || rec.empCode, rowLabel });
       }
     });
 
