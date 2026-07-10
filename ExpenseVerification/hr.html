@@ -594,7 +594,6 @@
                   <th>Bank Name</th>
                   <th>Account Number</th>
                   <th>IFSC</th>
-                  <th>Name in Bank</th>
                   <th>Branch</th>
                   <th>Division</th>
                   <th>Month/Year</th>
@@ -602,7 +601,7 @@
               </thead>
               <tbody id="hr-view-tbody">
                 <tr>
-                  <td colspan="10" style="text-align:center;padding:40px;color:var(--text-muted)">
+                  <td colspan="9" style="text-align:center;padding:40px;color:var(--text-muted)">
                     No HR data loaded yet
                   </td>
                 </tr>
@@ -1295,7 +1294,7 @@
 
     const tbody = document.getElementById('hr-view-tbody');
     if (!slice.length) {
-      tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:40px;color:var(--text-muted)">
+      tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--text-muted)">
         ${_viewRecords.length ? 'No records match your search' : 'No HR data loaded yet'}</td></tr>`;
     } else {
       tbody.innerHTML = slice.map((r, i) => `<tr>
@@ -1305,7 +1304,6 @@
         <td style="font-size:.8rem">${Utils.escapeHtml(r.bankName||'—')}</td>
         <td style="font-family:monospace;font-size:.78rem">${Utils.escapeHtml(r.bankAccountNumber||'—')}</td>
         <td style="font-family:monospace;font-size:.78rem">${Utils.escapeHtml(r.ifsc||'—')}</td>
-        <td style="font-size:.8rem">${Utils.escapeHtml(r.nameInBank||'—')}</td>
         <td style="font-size:.78rem">${Utils.escapeHtml(r.branch||'—')}</td>
         <td style="font-size:.78rem">${Utils.escapeHtml(r.division||'—')}</td>
         <td style="font-size:.78rem;color:var(--text-muted)">${Utils.escapeHtml(`${r.month||''}${r.year ? '/' + r.year : ''}`) || '—'}</td>
