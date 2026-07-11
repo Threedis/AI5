@@ -400,7 +400,9 @@
                   <div id="gen-expense-subtitle" style="font-size:.8rem;color:var(--text-muted)">Ready to generate expense payment file</div>
                 </div>
               </div>
-              <div style="display:flex;gap:10px">
+              <div style="display:flex;align-items:center;gap:10px">
+                <label style="font-size:.78rem;color:var(--text-muted);white-space:nowrap" for="gen-payment-date">Payment date</label>
+                <input type="date" class="form-control" id="gen-payment-date" style="width:150px">
                 <button class="btn btn-sm" id="btn-gen-sal" style="display:none;background:#0A5F0A;color:#fff;border:none;gap:6px">
                   <i class="fa-solid fa-file-arrow-down"></i> SAL File
                 </button>
@@ -610,6 +612,9 @@
   }
 
   refreshZohoAuthUI();
+
+  // Default the payment-date input to today; the user can adjust before generating.
+  document.getElementById('gen-payment-date').value = new Date().toISOString().slice(0, 10);
 
   document.getElementById('btn-zoho-connect').addEventListener('click', async () => {
     try { await ZohoProjects.connect(); }
@@ -1314,9 +1319,22 @@
     }
   }
 
-  /* ── Generate SAL or NAS expense file ──────────────────── */
+  /* ── Generate SAL or NES expense file ────────────────────
+     Filename spec: 275T{SAL,NES}{DDMM}.{SERIAL} — SERIAL is a two-digit
+     counter shared across both file types, incrementing only for files
+     that actually get generated (see Database.nextSerial). ────────── */
   async function generateExpenseFile(forceType) {
     if (!verifyEmpIds.length) return;
+
+    const dateVal = document.getElementById('gen-payment-date').value;
+    if (!dateVal) { App.Toast.warning('Payment Date', 'Select the payment date first.'); return; }
+    const paymentDate = new Date(dateVal + 'T00:00:00');
+    const dd = String(paymentDate.getDate()).padStart(2, '0');
+    const mm = String(paymentDate.getMonth() + 1).padStart(2, '0');
+    const yyyy = paymentDate.getFullYear();
+    const ddmm = `${dd}${mm}`;
+    const yyyymmdd = `${yyyy}${mm}${dd}`;
+
     App.Loader.show('Generating expense file…');
     try {
       const hrAll  = await Database.getAll('hrMaster');
@@ -1336,40 +1354,41 @@
         const type = /hdfc/i.test(bank) ? 'SAL' : 'NES';
         if (type !== forceType) continue;
         rows.push({
-          empId:  id,
-          name:   hr.employeeName || acc.empName || '',
-          bank:   acc.bankName || '',
+          empId:  key,
+          // "Name in Bank" is what the bank has on file for this account —
+          // required by both formats, and distinct from the HR/employee name.
+          name:   acc.nameInBank || hr.nameInBank || hr.employeeName || acc.empName || '',
           accNo:  acc.accountNo || '',
-          ifsc:   acc.ifsc || hr.ifsc || '',
-          amount: amounts[key] || acc.netPay || 0,
-          type,
+          ifsc:   (acc.ifsc || hr.ifsc || '').toUpperCase(),
+          amount: Math.round(amounts[key] || acc.netPay || 0),
         });
       }
 
       if (!rows.length) { App.Toast.warning('No Records', `No ${forceType === 'SAL' ? 'HDFC bank' : 'non-HDFC bank'} employees found for ${forceType} file.`); return; }
 
-      let content, filename;
+      // Only files that actually get generated consume a serial number.
+      const serial = await Database.nextSerial('salNesSerial');
+      const filename = `275T${forceType}${ddmm}.${String(serial).padStart(2, '0')}`;
+
+      let content;
       if (forceType === 'SAL') {
-        // HDFC's actual bulk-upload layout: no quoting, fixed 'C' (credit) column,
-        // whole-rupee amount, uppercase narration — not a generic labeled CSV.
+        // HDFC's bulk-upload layout: header row, no quoting, fixed 'C' (credit)
+        // column, whole-rupee amount, uppercase narration.
         const header   = 'ACCOUNT,C,AMOUNT,NARRATION';
-        const dataRows = rows.map(r => `${r.accNo},C,${Math.round(r.amount)},${r.name.toUpperCase()}`);
-        content  = [header, ...dataRows].join('\r\n') + '\r\n';
-        filename = `SAL_${zohoTask?.taskId || 'export'}_${new Date().toISOString().slice(0,10)}.txt`;
+        const dataRows = rows.map(r => `${r.accNo},C,${r.amount},${r.name.toUpperCase()}`);
+        content = [header, ...dataRows].join('\r\n') + '\r\n';
       } else {
-        const header  = 'Emp ID,Name,Bank,Account No,IFSC,Amount,Type';
-        const csvRows = rows.map(r =>
-          [r.empId, r.name, r.bank, r.accNo, r.ifsc, r.amount, r.type]
-            .map(v => `"${String(v).replace(/"/g, '""')}"`).join(','));
-        content  = [header, ...csvRows].join('\r\n');
-        filename = `expense_${forceType}_${zohoTask?.taskId || 'export'}_${new Date().toISOString().slice(0,10)}.csv`;
+        // HDFC-to-other-banks NEFT layout: no header, fixed '02' transaction
+        // code, payment date as yyyymmdd.
+        const dataRows = rows.map(r => `${r.empId},${r.name.toUpperCase()},${r.accNo},${r.ifsc},02,${r.amount},${yyyymmdd}`);
+        content = dataRows.join('\r\n') + '\r\n';
       }
       const blob = new Blob([content], { type: 'text/plain' });
       const url  = URL.createObjectURL(blob);
       const a    = Object.assign(document.createElement('a'), { href: url, download: filename });
       a.click();
       URL.revokeObjectURL(url);
-      App.Toast.success('Expense file generated successfully.', 'Download has started.');
+      App.Toast.success('Expense file generated successfully.', `Saved as ${filename}`);
     } catch (err) {
       App.Toast.error('Failed', err.message);
     } finally {

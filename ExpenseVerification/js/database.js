@@ -86,6 +86,12 @@ const Database = (() => {
     return records.length;
   }
 
+  /* ── Shared, atomically-incrementing counter (e.g. SAL/NES file serials) ── */
+  async function nextSerial(key) {
+    const { serial } = await apiFetch('/api/serial/next', { method: 'POST', body: JSON.stringify({ key }) });
+    return serial;
+  }
+
   /* ── Settings helpers ───────────────────────────────────── */
   async function getSetting(key, defaultVal = null) {
     try {
@@ -126,6 +132,7 @@ const Database = (() => {
     remove, delete: del,
     count, clear, bulkPut,
     getSetting, setSetting,
+    nextSerial,
     exportAll, importAll,
   };
 })();
