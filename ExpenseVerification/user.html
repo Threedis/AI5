@@ -402,7 +402,7 @@
               </div>
               <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
                 <label style="font-size:.78rem;color:var(--text-muted);white-space:nowrap" for="gen-serial-no">Last serial no.</label>
-                <input type="number" class="form-control" id="gen-serial-no" min="0" step="1" style="width:90px" title="275TSAL/NES shared serial counter — correct it here if it ever gets out of sync">
+                <input type="number" class="form-control" id="gen-serial-no" min="1" step="1" style="width:90px" title="Last 275TSAL/NES serial number used — the next file generated will be this +1">
                 <button class="btn btn-ghost btn-sm" id="btn-save-serial" title="Save corrected serial number"><i class="fa-solid fa-floppy-disk"></i></button>
                 <label style="font-size:.78rem;color:var(--text-muted);white-space:nowrap" for="gen-payment-date">Payment date</label>
                 <input type="date" class="form-control" id="gen-payment-date" style="width:150px">
@@ -620,10 +620,10 @@
   document.getElementById('gen-payment-date').value = new Date().toISOString().slice(0, 10);
 
   // Shared 275TSAL/NES serial counter — any user on this page can view/correct it.
-  document.getElementById('gen-serial-no').value = await Database.getSetting('salNesSerial', 0);
+  document.getElementById('gen-serial-no').value = await Database.getSetting('salNesSerial', 1);
   document.getElementById('btn-save-serial').addEventListener('click', async () => {
     const n = parseInt(document.getElementById('gen-serial-no').value, 10);
-    if (!Number.isFinite(n) || n < 0) { App.Toast.warning('Serial No.', 'Enter a non-negative whole number.'); return; }
+    if (!Number.isFinite(n) || n < 1) { App.Toast.warning('Serial No.', 'Enter a whole number, 1 or higher.'); return; }
     try {
       await Database.setSerial('salNesSerial', n);
       App.Toast.success('Saved', `Serial number set to ${n}.`);
@@ -1337,8 +1337,9 @@
 
   /* ── Generate SAL or NES expense file ────────────────────
      Filename spec: 275T{SAL,NES}{DDMM}.{SERIAL} — SERIAL is a two-digit
-     counter shared across both file types, incrementing only for files
-     that actually get generated (see Database.nextSerial). ────────── */
+     counter shared across both file types. The #gen-serial-no box holds
+     the last serial actually used; each generated file takes box+1 and
+     saves that back, so skipped/empty categories never consume a number. */
   async function generateExpenseFile(forceType) {
     if (!verifyEmpIds.length) return;
 
@@ -1382,8 +1383,16 @@
 
       if (!rows.length) { App.Toast.warning('No Records', `No ${forceType === 'SAL' ? 'HDFC bank' : 'non-HDFC bank'} employees found for ${forceType} file.`); return; }
 
-      // Only files that actually get generated consume a serial number.
-      const serial = await Database.nextSerial('salNesSerial');
+      // Whatever's currently in the box is the last serial used — the file
+      // being generated now takes the next number. Only files that actually
+      // get generated consume one.
+      const lastSerial = parseInt(document.getElementById('gen-serial-no').value, 10);
+      if (!Number.isFinite(lastSerial) || lastSerial < 1) {
+        App.Toast.warning('Serial No.', 'Enter the last serial number used (1 or higher) first.');
+        return;
+      }
+      const serial = lastSerial + 1;
+      await Database.setSerial('salNesSerial', serial);
       document.getElementById('gen-serial-no').value = serial;
       const filename = `275T${forceType}${ddmm}.${String(serial).padStart(2, '0')}`;
 

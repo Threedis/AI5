@@ -1,9 +1,9 @@
 import { requireUser } from '../_lib/auth.js';
 
-// Explicitly sets a named counter (see next.js for the atomic-increment
-// counterpart). Open to any authenticated user — this is a Verification-page
-// control, not admin-only — restricted to the same allowlist so it can't be
-// used to overwrite unrelated settings.
+// Explicitly sets a named counter, e.g. the 275TSAL/NES last-serial-used
+// value on the Verification page. Open to any authenticated user (not
+// admin-only) — restricted to an explicit allowlist so it can't be used to
+// overwrite unrelated settings like zohoClientId.
 const ALLOWED_COUNTERS = new Set(['salNesSerial']);
 
 export async function onRequestPost({ request, env }) {
@@ -13,7 +13,7 @@ export async function onRequestPost({ request, env }) {
   const { key, value } = await request.json();
   if (!ALLOWED_COUNTERS.has(key)) return new Response(JSON.stringify({ error: 'Unknown counter' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
   const n = parseInt(value, 10);
-  if (!Number.isFinite(n) || n < 0) return new Response(JSON.stringify({ error: 'value must be a non-negative integer' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+  if (!Number.isFinite(n) || n < 1) return new Response(JSON.stringify({ error: 'value must be a whole number, 1 or higher' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
 
   await env.DB.prepare(
     `insert into settings (key, value, updated_at) values (?, ?, datetime('now'))

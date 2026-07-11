@@ -20,7 +20,6 @@ import * as dataId from '../ExpenseVerification/functions/api/data/[store]/[id].
 import * as dataCount from '../ExpenseVerification/functions/api/data/[store]/count.js';
 import * as dataBulk from '../ExpenseVerification/functions/api/data/[store]/bulk.js';
 import * as settingsKey from '../ExpenseVerification/functions/api/settings/[key].js';
-import * as serialNext from '../ExpenseVerification/functions/api/serial/next.js';
 import * as serialSet from '../ExpenseVerification/functions/api/serial/set.js';
 
 // Ordered so more specific literal segments (count/bulk) are tried before
@@ -46,7 +45,6 @@ const ROUTES = [
   { method: 'DELETE', pattern: '/api/data/:store',                  handler: dataIndex.onRequestDelete },
   { method: 'GET',    pattern: '/api/settings/:key',                handler: settingsKey.onRequestGet },
   { method: 'PUT',    pattern: '/api/settings/:key',                handler: settingsKey.onRequestPut },
-  { method: 'POST',   pattern: '/api/serial/next',                  handler: serialNext.onRequestPost },
   { method: 'POST',   pattern: '/api/serial/set',                   handler: serialSet.onRequestPost },
 ];
 
