@@ -92,6 +92,11 @@ const Database = (() => {
     return serial;
   }
 
+  async function setSerial(key, value) {
+    const { serial } = await apiFetch('/api/serial/set', { method: 'POST', body: JSON.stringify({ key, value }) });
+    return serial;
+  }
+
   /* ── Settings helpers ───────────────────────────────────── */
   async function getSetting(key, defaultVal = null) {
     try {
@@ -132,7 +137,7 @@ const Database = (() => {
     remove, delete: del,
     count, clear, bulkPut,
     getSetting, setSetting,
-    nextSerial,
+    nextSerial, setSerial,
     exportAll, importAll,
   };
 })();

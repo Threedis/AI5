@@ -400,7 +400,10 @@
                   <div id="gen-expense-subtitle" style="font-size:.8rem;color:var(--text-muted)">Ready to generate expense payment file</div>
                 </div>
               </div>
-              <div style="display:flex;align-items:center;gap:10px">
+              <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                <label style="font-size:.78rem;color:var(--text-muted);white-space:nowrap" for="gen-serial-no">Last serial no.</label>
+                <input type="number" class="form-control" id="gen-serial-no" min="0" step="1" style="width:90px" title="275TSAL/NES shared serial counter — correct it here if it ever gets out of sync">
+                <button class="btn btn-ghost btn-sm" id="btn-save-serial" title="Save corrected serial number"><i class="fa-solid fa-floppy-disk"></i></button>
                 <label style="font-size:.78rem;color:var(--text-muted);white-space:nowrap" for="gen-payment-date">Payment date</label>
                 <input type="date" class="form-control" id="gen-payment-date" style="width:150px">
                 <button class="btn btn-sm" id="btn-gen-sal" style="display:none;background:#0A5F0A;color:#fff;border:none;gap:6px">
@@ -615,6 +618,19 @@
 
   // Default the payment-date input to today; the user can adjust before generating.
   document.getElementById('gen-payment-date').value = new Date().toISOString().slice(0, 10);
+
+  // Shared 275TSAL/NES serial counter — any user on this page can view/correct it.
+  document.getElementById('gen-serial-no').value = await Database.getSetting('salNesSerial', 0);
+  document.getElementById('btn-save-serial').addEventListener('click', async () => {
+    const n = parseInt(document.getElementById('gen-serial-no').value, 10);
+    if (!Number.isFinite(n) || n < 0) { App.Toast.warning('Serial No.', 'Enter a non-negative whole number.'); return; }
+    try {
+      await Database.setSerial('salNesSerial', n);
+      App.Toast.success('Saved', `Serial number set to ${n}.`);
+    } catch (err) {
+      App.Toast.error('Failed', err.message);
+    }
+  });
 
   document.getElementById('btn-zoho-connect').addEventListener('click', async () => {
     try { await ZohoProjects.connect(); }
@@ -1368,6 +1384,7 @@
 
       // Only files that actually get generated consume a serial number.
       const serial = await Database.nextSerial('salNesSerial');
+      document.getElementById('gen-serial-no').value = serial;
       const filename = `275T${forceType}${ddmm}.${String(serial).padStart(2, '0')}`;
 
       let content;
