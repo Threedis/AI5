@@ -1348,17 +1348,25 @@
 
       if (!rows.length) { App.Toast.warning('No Records', `No ${forceType === 'SAL' ? 'HDFC bank' : 'non-HDFC bank'} employees found for ${forceType} file.`); return; }
 
-      const header  = 'Emp ID,Name,Bank,Account No,IFSC,Amount,Type';
-      const csvRows = rows.map(r =>
-        [r.empId, r.name, r.bank, r.accNo, r.ifsc, r.amount, r.type]
-          .map(v => `"${String(v).replace(/"/g, '""')}"`).join(','));
-      const csv  = [header, ...csvRows].join('\r\n');
-      const blob = new Blob([csv], { type: 'text/csv' });
+      let content, filename;
+      if (forceType === 'SAL') {
+        // HDFC's actual bulk-upload layout: no quoting, fixed 'C' (credit) column,
+        // whole-rupee amount, uppercase narration — not a generic labeled CSV.
+        const header   = 'ACCOUNT,C,AMOUNT,NARRATION';
+        const dataRows = rows.map(r => `${r.accNo},C,${Math.round(r.amount)},${r.name.toUpperCase()}`);
+        content  = [header, ...dataRows].join('\r\n') + '\r\n';
+        filename = `SAL_${zohoTask?.taskId || 'export'}_${new Date().toISOString().slice(0,10)}.txt`;
+      } else {
+        const header  = 'Emp ID,Name,Bank,Account No,IFSC,Amount,Type';
+        const csvRows = rows.map(r =>
+          [r.empId, r.name, r.bank, r.accNo, r.ifsc, r.amount, r.type]
+            .map(v => `"${String(v).replace(/"/g, '""')}"`).join(','));
+        content  = [header, ...csvRows].join('\r\n');
+        filename = `expense_${forceType}_${zohoTask?.taskId || 'export'}_${new Date().toISOString().slice(0,10)}.csv`;
+      }
+      const blob = new Blob([content], { type: 'text/plain' });
       const url  = URL.createObjectURL(blob);
-      const a    = Object.assign(document.createElement('a'), {
-        href: url,
-        download: `expense_${forceType}_${zohoTask?.taskId || 'export'}_${new Date().toISOString().slice(0,10)}.csv`,
-      });
+      const a    = Object.assign(document.createElement('a'), { href: url, download: filename });
       a.click();
       URL.revokeObjectURL(url);
       App.Toast.success('Expense file generated successfully.', 'Download has started.');
