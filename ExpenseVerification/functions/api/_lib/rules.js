@@ -12,6 +12,7 @@
  *   audit_logs        — read: admin only   / write(insert): authenticated
  *   settings          — read: authenticated / write: admin only
  *   verifications, version_history, accounts_batches — read+write: authenticated
+ *   expense_file_log  — read+write: authenticated (Verification-page file-generation log)
  */
 export const RULES = {
   users:           { read: 'authenticated', write: ['admin'] },
@@ -22,6 +23,7 @@ export const RULES = {
   verifications:   { read: 'authenticated', write: 'authenticated' },
   versionHistory:  { read: 'authenticated', write: 'authenticated' },
   accountsBatches: { read: 'authenticated', write: 'authenticated' },
+  expenseFileLog:  { read: 'authenticated', write: 'authenticated' },
 };
 
 /** Returns true if `user` (or null, if unauthenticated) satisfies `requirement`. */

@@ -12,6 +12,7 @@ export const TABLE = {
   versionHistory:  'version_history',
   verifications:   'verifications',
   accountsBatches: 'accounts_batches',
+  expenseFileLog:  'expense_file_log',
 };
 
 // explicit column allowlists — insert/upsert only ever writes columns listed
@@ -45,7 +46,7 @@ const PK_COLUMN = { settings: 'key' };
 // want (encryptedData, fileNames, validationSummary, ...), so a column
 // allowlist would silently drop most of it. Store the whole record as one
 // JSON blob instead and hand it back byte-for-byte on read.
-const BLOB_TABLES = new Set(['verifications', 'version_history', 'accounts_batches']);
+const BLOB_TABLES = new Set(['verifications', 'version_history', 'accounts_batches', 'expense_file_log']);
 
 // hr_master/accounts_master records are built by hr.js/accounts.js using
 // camelCase field names (employeeId, empCode, ...) — translate to/from the

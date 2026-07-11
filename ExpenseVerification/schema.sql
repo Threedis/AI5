@@ -107,3 +107,11 @@ create table if not exists accounts_batches (
   data       text not null,
   created_at text default (datetime('now'))
 );
+
+-- One row per SAL/NES file actually generated on the Verification page —
+-- filename, type, who/when, and the employee/amount detail included.
+create table if not exists expense_file_log (
+  id         text primary key,
+  data       text not null,
+  created_at text default (datetime('now'))
+);

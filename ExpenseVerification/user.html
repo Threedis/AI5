@@ -111,8 +111,7 @@
 
     <div class="nav-section-label">Verification</div>
     <button class="nav-item" data-page="user.html"><span class="nav-icon"><i class="fa-solid fa-file-pdf"></i></span><span class="nav-label">Upload Approval</span></button>
-    <button class="nav-item" data-page="user.html" data-tab="verify"><span class="nav-icon"><i class="fa-solid fa-shield-check"></i></span><span class="nav-label">Verify Employees</span></button>
-    <button class="nav-item" data-page="user.html" data-tab="reports"><span class="nav-icon"><i class="fa-solid fa-file-chart-column"></i></span><span class="nav-label">Reports</span></button>
+    <button class="nav-item" data-page="user.html" data-tab="verify"><span class="nav-icon"><i class="fa-solid fa-shield-check"></i></span><span class="nav-label">HR vs Acc Full Reco</span></button>
   </nav>
   <div class="sidebar-footer">
     <div class="sidebar-user">
@@ -148,10 +147,9 @@
     <div data-tab-group id="main-tabs">
       <div class="tabs-nav">
         <button class="tab-btn active" data-tab="pdf"><i class="fa-solid fa-file-pdf"></i> Upload Approval</button>
-        <button class="tab-btn" data-tab="verify"><i class="fa-solid fa-shield-check"></i> Verify <span class="badge badge-blue" id="verify-count-badge" style="display:none">0</span></button>
         <button class="tab-btn" data-tab="search"><i class="fa-solid fa-magnifying-glass"></i> Search</button>
         <button class="tab-btn" data-tab="history"><i class="fa-solid fa-clock-rotate-left"></i> History</button>
-        <button class="tab-btn" data-tab="reports"><i class="fa-solid fa-file-chart-column"></i> Reports</button>
+        <button class="tab-btn" data-tab="verify"><i class="fa-solid fa-shield-check"></i> HR vs Acc Full Reco <span class="badge badge-blue" id="verify-count-badge" style="display:none">0</span></button>
       </div>
 
       <!-- ══════ PDF Upload Tab ══════════════════════════════ -->
@@ -448,74 +446,37 @@
 
       <!-- ══════ History Tab ════════════════════════════════ -->
       <div class="tab-pane" data-tab="history">
-        <div id="history-list" style="display:flex;flex-direction:column;gap:10px;min-height:200px">
-          <div style="text-align:center;padding:40px;color:var(--text-muted)">Loading…</div>
-        </div>
-      </div>
-
-      <!-- ══════ Reports Tab ════════════════════════════════ -->
-      <div class="tab-pane" data-tab="reports">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px">
-          <!-- Discrepancy report -->
-          <div class="card">
-            <div class="card-header">
-              <div class="card-title"><i class="fa-solid fa-triangle-exclamation" style="color:var(--accent-orange)"></i> Discrepancy Report</div>
-            </div>
-            <div class="card-body">
-              <p style="font-size:.875rem;color:var(--text-secondary);margin-bottom:16px">
-                Download an Excel report of all employees with account mismatches, wrong IFSC, or missing records.
-              </p>
-              <button class="btn btn-outline" id="btn-discrepancy-report">
-                <i class="fa-solid fa-file-arrow-down"></i> Generate &amp; Download
-              </button>
-            </div>
-          </div>
-
-          <!-- Payment files -->
-          <div class="card">
-            <div class="card-header">
-              <div class="card-title"><i class="fa-solid fa-money-bill-transfer" style="color:var(--accent-green)"></i> Payment Files</div>
-            </div>
-            <div class="card-body">
-              <p style="font-size:.875rem;color:var(--text-secondary);margin-bottom:16px">
-                Generate payment files from matched/partial records.
-              </p>
-              <div style="display:flex;gap:10px;flex-wrap:wrap">
-                <button class="btn btn-outline" id="btn-rpt-hdfc">
-                  <i class="fa-solid fa-building-columns"></i> HDFC Format
-                </button>
-                <button class="btn btn-outline" id="btn-rpt-nes">
-                  <i class="fa-solid fa-file-csv"></i> NES Format
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Discrepancy details table -->
-        <div class="card">
+        <div class="card" style="margin-bottom:20px">
           <div class="card-header">
-            <div class="card-title"><i class="fa-solid fa-table"></i> Discrepancy Detail</div>
-            <div id="discrepancy-count" style="font-size:.78rem;color:var(--text-muted)">Run verification first</div>
+            <div class="card-title"><i class="fa-solid fa-money-bill-transfer"></i> Generated Files</div>
           </div>
-          <div class="table-toolbar">
-            <div class="table-search">
-              <i class="fa-solid fa-magnifying-glass"></i>
-              <input type="text" id="discrepancy-filter" placeholder="Filter…">
-            </div>
-          </div>
-          <div class="table-wrap" style="max-height:420px;overflow-y:auto;overflow-x:auto">
-            <table class="data-table" style="min-width:800px">
+          <div class="table-wrap" style="max-height:480px;overflow-y:auto;overflow-x:auto">
+            <table class="data-table" style="min-width:820px">
               <thead>
-                <tr><th>Emp ID</th><th>HR Name</th><th>Field</th><th>HR Value</th><th>Accounts Value</th><th>Severity</th></tr>
+                <tr>
+                  <th>Type</th><th>Filename</th><th>Payment Date</th>
+                  <th>Generated At</th><th>By</th><th>Records</th><th>Total Amount</th><th></th>
+                </tr>
               </thead>
-              <tbody id="discrepancy-tbody">
-                <tr><td colspan="6" style="text-align:center;padding:40px;color:var(--text-muted)">No verification run yet</td></tr>
+              <tbody id="file-log-tbody">
+                <tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-muted)">Loading…</td></tr>
               </tbody>
             </table>
           </div>
         </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title"><i class="fa-solid fa-clock-rotate-left"></i> Verification Sessions</div>
+          </div>
+          <div class="card-body">
+            <div id="history-list" style="display:flex;flex-direction:column;gap:10px;min-height:200px">
+              <div style="text-align:center;padding:40px;color:var(--text-muted)">Loading…</div>
+            </div>
+          </div>
+        </div>
       </div>
+
 
     </div><!-- /main-tabs -->
   </div><!-- /page-content -->
@@ -1136,7 +1097,6 @@
 
       verifyResults = results;
       renderVerifyResults(results, summary);
-      renderDiscrepancyTable(results);
       await loadHistory();
 
       App.Toast.success('Verification Complete',
@@ -1414,6 +1374,24 @@
       const a    = Object.assign(document.createElement('a'), { href: url, download: filename });
       a.click();
       URL.revokeObjectURL(url);
+
+      try {
+        await Database.add('expenseFileLog', {
+          id:            Utils.uuid(),
+          type:          forceType,
+          filename,
+          generatedAt:   new Date().toISOString(),
+          generatedBy:   Auth.getCurrentUser()?.username || 'system',
+          paymentDate:   dateVal,
+          recordCount:   rows.length,
+          totalAmount:   rows.reduce((sum, r) => sum + r.amount, 0),
+          employees:     rows.map(r => ({ empId: r.empId, name: r.name, amount: r.amount })),
+        });
+        await loadFileLog();
+      } catch (logErr) {
+        console.warn('[Verification] Failed to log generated file:', logErr);
+      }
+
       App.Toast.success('Expense file generated successfully.', `Saved as ${filename}`);
     } catch (err) {
       App.Toast.error('Failed', err.message);
@@ -1475,6 +1453,60 @@
   /* ══════════════════════════════════════════════════════════
      HISTORY TAB
   ══════════════════════════════════════════════════════════ */
+  async function loadFileLog() {
+    const tbody = document.getElementById('file-log-tbody');
+    try {
+      const entries = (await Database.getAll('expenseFileLog'))
+        .sort((a, b) => new Date(b.generatedAt) - new Date(a.generatedAt));
+
+      if (!entries.length) {
+        tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-muted)">No files generated yet</td></tr>`;
+        return;
+      }
+
+      const typeBadge = t => t === 'SAL'
+        ? '<span class="badge badge-green">SAL</span>'
+        : '<span class="badge badge-blue">NES</span>';
+
+      tbody.innerHTML = entries.map(e => `
+        <tr>
+          <td>${typeBadge(e.type)}</td>
+          <td style="font-family:var(--font-mono);font-size:.8rem">${Utils.escapeHtml(e.filename || '—')}</td>
+          <td style="font-size:.8rem">${e.paymentDate ? Utils.formatDate(e.paymentDate) : '—'}</td>
+          <td style="font-size:.8rem;white-space:nowrap">${Utils.formatDateTime(e.generatedAt)}</td>
+          <td style="font-size:.8rem">${Utils.escapeHtml(e.generatedBy || '—')}</td>
+          <td style="font-weight:600">${Utils.formatNumber(e.recordCount || (e.employees||[]).length)}</td>
+          <td style="font-family:var(--font-mono);font-size:.82rem">${Utils.formatCurrency(e.totalAmount || 0)}</td>
+          <td><button class="btn btn-ghost btn-sm" onclick="viewFileLogEntry('${e.id}')"><i class="fa-solid fa-eye"></i></button></td>
+        </tr>`).join('');
+    } catch (e) {
+      tbody.innerHTML = `<tr><td colspan="8" style="color:var(--accent-red);padding:20px">${Utils.escapeHtml(e.message)}</td></tr>`;
+    }
+  }
+
+  window.viewFileLogEntry = async id => {
+    const entry = await Database.get('expenseFileLog', id);
+    if (!entry) return;
+    const rows = (entry.employees || []).map(emp => `
+      <tr>
+        <td style="font-family:var(--font-mono);font-size:.8rem">${Utils.escapeHtml(emp.empId||'—')}</td>
+        <td>${Utils.escapeHtml(emp.name||'—')}</td>
+        <td style="font-family:var(--font-mono);font-size:.82rem">${Utils.formatCurrency(emp.amount||0)}</td>
+      </tr>`).join('');
+    const { el, close } = App.Modal.create({
+      title: `${entry.filename} — ${(entry.employees||[]).length} employee(s)`,
+      body: `
+        <div class="table-wrap" style="max-height:400px;overflow-y:auto">
+          <table class="data-table">
+            <thead><tr><th>Emp ID</th><th>Name</th><th>Amount</th></tr></thead>
+            <tbody>${rows || '<tr><td colspan="3" style="text-align:center;padding:20px;color:var(--text-muted)">No employee detail recorded</td></tr>'}</tbody>
+          </table>
+        </div>`,
+      footer: `<button class="btn btn-primary" id="filelog-modal-close">Close</button>`,
+    });
+    el.querySelector('#filelog-modal-close').addEventListener('click', close);
+  };
+
   async function loadHistory() {
     const container = document.getElementById('history-list');
     try {
@@ -1529,7 +1561,6 @@
       const { results, summary } = await Verification.loadSession(id);
       verifyResults = results;
       renderVerifyResults(results, summary);
-      renderDiscrepancyTable(results);
       document.querySelector('.tab-btn[data-tab="verify"]').click();
       App.Toast.success('Loaded', 'Verification session loaded.');
     } catch (e) {
@@ -1546,57 +1577,6 @@
     App.Toast.success('Deleted', 'Session deleted.');
     await loadHistory();
   };
-
-  /* ══════════════════════════════════════════════════════════
-     REPORTS TAB
-  ══════════════════════════════════════════════════════════ */
-  function renderDiscrepancyTable(results) {
-    const issues = results.flatMap(r =>
-      r.issues.filter(i => i.severity !== 'info').map(issue => ({
-        empId:   r.empId,
-        hrName:  r.hr?.employeeName || r.empName,
-        ...issue,
-      }))
-    );
-    document.getElementById('discrepancy-count').textContent = `${issues.length} issue(s)`;
-
-    const q     = document.getElementById('discrepancy-filter').value.toLowerCase();
-    const rows  = q ? issues.filter(i => (i.empId||'').toLowerCase().includes(q) || (i.hrName||'').toLowerCase().includes(q)) : issues;
-
-    const sevClass = { error:'badge-red', warning:'badge-yellow', info:'badge-blue' };
-    document.getElementById('discrepancy-tbody').innerHTML = rows.length ? rows.map(i => `
-      <tr style="${i.severity==='error'?'background:#fef0f0':i.severity==='warning'?'background:#fffde7':''}">
-        <td style="font-family:var(--font-mono);font-size:.8rem">${Utils.escapeHtml(i.empId||'—')}</td>
-        <td>${Utils.escapeHtml(i.hrName||'—')}</td>
-        <td><code style="font-size:.75rem">${i.field}</code></td>
-        <td style="font-family:var(--font-mono);font-size:.8rem">${Utils.escapeHtml(String(i.hrValue??'—'))}</td>
-        <td style="font-family:var(--font-mono);font-size:.8rem">${Utils.escapeHtml(String(i.accValue??'—'))}</td>
-        <td><span class="badge ${sevClass[i.severity]||'badge-blue'}">${i.severity}</span></td>
-      </tr>`).join('') :
-      '<tr><td colspan="6" style="text-align:center;padding:30px;color:var(--text-muted)">No issues found</td></tr>';
-  }
-
-  document.getElementById('discrepancy-filter').addEventListener('input', Utils.debounce(() => {
-    if (verifyResults) renderDiscrepancyTable(verifyResults);
-  }, 250));
-
-  document.getElementById('btn-discrepancy-report').addEventListener('click', async () => {
-    if (!verifyResults) { App.Toast.warning('No Data', 'Run verification first.'); return; }
-    try { App.Loader.show('Generating…'); await Verification.generateDiscrepancyReport(verifyResults); App.Loader.hide(); }
-    catch (e) { App.Loader.hide(); App.Toast.error('Failed', e.message); }
-  });
-
-  document.getElementById('btn-rpt-hdfc').addEventListener('click', () => {
-    if (!verifyResults) { App.Toast.warning('No Data', 'Run verification first.'); return; }
-    try { Verification.generateHDFCFile(verifyResults); }
-    catch (e) { App.Toast.error('Failed', e.message); }
-  });
-
-  document.getElementById('btn-rpt-nes').addEventListener('click', () => {
-    if (!verifyResults) { App.Toast.warning('No Data', 'Run verification first.'); return; }
-    try { Verification.generateNESFile(verifyResults); }
-    catch (e) { App.Toast.error('Failed', e.message); }
-  });
 
   /* ── Pagination helper ──────────────────────────────────── */
   function renderPagination(id, cur, total, onClick) {
@@ -1630,6 +1610,7 @@
   setApprovalMode('zoho');
 
   /* ── Initial load ───────────────────────────────────────── */
+  await loadFileLog();
   await loadHistory();
   await Audit.log({ module: 'Verification', action: 'PageView', status: 'success' });
 
