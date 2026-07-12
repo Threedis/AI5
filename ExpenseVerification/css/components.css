@@ -30,12 +30,24 @@
 }
 
 .app-header .brand-icon {
-  width: 36px; height: 36px;
-  background: rgba(255,255,255,.18);
-  border-radius: var(--radius-sm);
+  width: 40px; height: 40px;
+  background: rgba(255,255,255,.95);
+  border-radius: 10px;
   display: flex; align-items: center; justify-content: center;
+  padding: 6px;
   font-size: 1.1rem;
   flex-shrink: 0;
+  box-shadow: 0 1px 3px rgba(0,0,0,.2);
+  transition: transform .18s ease, box-shadow .18s ease;
+}
+.app-header .brand-icon:hover {
+  transform: scale(1.08);
+  box-shadow: 0 0 0 3px rgba(255,255,255,.35), 0 4px 10px rgba(0,0,0,.25);
+}
+.app-header .brand-icon img {
+  width: 100%; height: 100%;
+  object-fit: contain;
+  display: block;
 }
 
 .app-header .header-actions {
@@ -757,4 +769,5 @@
   .page-content { padding: 16px; }
   .header-search { display: none; }
   .stat-value { font-size: 1.4rem; }
+  .app-header .brand-icon { width: 32px; height: 32px; padding: 5px; }
 }
