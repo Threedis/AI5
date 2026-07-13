@@ -437,11 +437,13 @@ const ZohoProjects = (() => {
      Renders the real HTML Zoho stores (tables, images, lists, inline
      styles, links, headings, code blocks) instead of flattening it to
      plain text — only script/style tags, unsafe URL schemes, and
-     unrecognised CSS properties are stripped. [@zpuser#id#Name]
-     mentions are dropped entirely (Zoho re-shows the author's name in
-     the comment header already — keeping the mention inline would
-     just duplicate it). ── */
-  const MENTION_RE   = /\[?@zpuser#\d+#[^\]]*\]?\s*/g;
+     unrecognised CSS properties are stripped.
+     @mentions are serialized as "zp[@zpuser#id#Name]zp" (confirmed
+     against live task payloads) and are rendered as a visible styled
+     chip with the resolved name — Zoho's own UI shows these inline
+     even when a comment mentions its own author, so nothing is
+     dropped here. ── */
+  const MENTION_RE   = /(?:zp)?\[@zpuser#\d+#([^\]]*)\](?:zp)?/gi;
   const ALLOWED_TAGS = new Set([
     'B','STRONG','I','EM','U','S','STRIKE','BR','P','DIV','SPAN',
     'UL','OL','LI','A','IMG','TABLE','THEAD','TBODY','TFOOT','TR','TD','TH',
@@ -449,18 +451,24 @@ const ZohoProjects = (() => {
   ]);
   const VOID_TAGS = new Set(['BR','IMG','HR']);
 
-  /* Zoho's rich-text editor represents an @mention as a non-text widget
-     (e.g. an avatar <img>/custom tag) sandwiched between literal "zp"
-     boundary markers with no recoverable name in this field — e.g. the
-     raw HTML is "zp<img ...>zp Approve plz". Once the widget tag is
-     dropped by the sanitizer above, the two "zp" markers are left
-     stranded as plain text and must be stripped too. */
+  /* Defensive cleanup for any stray "zp" boundary markers left behind by
+     a mention shape MENTION_RE doesn't match (e.g. a malformed/partial
+     token) — never matches "zp" as part of a longer word. */
   function stripZpNoise(text) {
     return text.replace(/\bzp\s*zp\b/gi, '').replace(/\bzp\b/gi, '');
   }
 
   function renderMentionText(text) {
-    return Utils.escapeHtml(stripZpNoise(text.replace(MENTION_RE, '')));
+    let out = '', last = 0, m;
+    MENTION_RE.lastIndex = 0;
+    while ((m = MENTION_RE.exec(text))) {
+      out += Utils.escapeHtml(stripZpNoise(text.slice(last, m.index)));
+      const name = (m[1] || '').replace(/^,/, '').trim();
+      if (name) out += `<span class="mention-chip">${Utils.escapeHtml(name)}</span>`;
+      last = MENTION_RE.lastIndex;
+    }
+    out += Utils.escapeHtml(stripZpNoise(text.slice(last)));
+    return out;
   }
 
   /* Allowlist of CSS properties safe to carry over from Zoho's inline
@@ -564,8 +572,12 @@ const ZohoProjects = (() => {
         if (name) return { name, photo: '', id: '', email: '' };
         continue;
       }
-      const name = cleanAuthorName(cand.name) || cleanAuthorName(cand.display_name) ||
-                   cleanAuthorName(cand.full_name) || cleanAuthorName(cand.first_name) ||
+      // full_name is Zoho's proper display name; name/first_name can be a
+      // short username (e.g. name:"sandeep" vs full_name:"Sandeep Panwar")
+      // that Zoho's own UI does not use for the comment header — confirmed
+      // against a live payload where the two differ.
+      const name = cleanAuthorName(cand.full_name) || cleanAuthorName(cand.name) ||
+                   cleanAuthorName(cand.display_name) || cleanAuthorName(cand.first_name) ||
                    (cand.email ? String(cand.email).split('@')[0] : '');
       if (name) {
         const photo = cand.photo || cand.photo_url || cand.image || cand.avatar || cand.profile_image || '';
@@ -588,18 +600,25 @@ const ZohoProjects = (() => {
       const data = await apiGet(`/portal/${enc(PORTAL_NAME)}/projects/${enc(projectId)}/tasks/${enc(taskId)}/comments/`);
       return (data.comments || []).map(c => {
         const raw = c.comment ?? c.content ?? '';
-        // Plain-text version (for regex-based extraction elsewhere) — mentions fully stripped
+        // Plain-text version (for regex-based extraction elsewhere) — mentions
+        // resolved to the mentioned person's name rather than dropped, so no
+        // information is lost for the emp-id/approval-keyword scanners.
         const plain = Utils.stripHtml(raw);
-        const cleanContent = stripZpNoise(plain.replace(/\[?@zpuser#\d+#[^\]]*\]?/g, '')).trim();
+        const cleanContent = stripZpNoise(plain.replace(MENTION_RE, '$1')).trim();
         const { name: authorName, photo: authorPhoto, id: authorId, email: authorEmail } = resolveCommentAuthor(c);
         const rawAtts = c.attachments || c.documents || c.files || [];
         const attachments = rawAtts.map(a => {
           const name = a.filename || a.file_name || a.name || a.title || 'Attachment';
-          const ext  = (name.split('.').pop() || '').toLowerCase();
+          // Zoho's own "category/ext" type field (e.g. "spreadsheet/xlsx") is
+          // more reliable than sniffing the filename when both are available.
+          const typeExt = (a.type || '').split('/').pop() || '';
+          const ext = (typeExt || name.split('.').pop() || '').toLowerCase();
           return {
             name,
             size:        a.filesize || a.file_size || a.size || 0,
             url:         a.download_url || a.url || a.file_url || a.link || a.href || '',
+            previewUrl:  a.preview_url || a.thumbnail_url || '',
+            ext,
             isImage:     /^(jpe?g|png|gif|webp|bmp|heic)$/.test(ext),
             previewable: /^(jpe?g|png|gif|webp|bmp|heic|pdf)$/.test(ext),
           };

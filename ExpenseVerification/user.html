@@ -33,7 +33,7 @@
     .approval-unknown  { background:var(--bg); color:var(--text-muted); border:1px solid var(--border); }
 
     /* ── Zoho-style @mention chip inside comment bodies ──────── */
-    .mention-chip { color:var(--primary); font-weight:600; }
+    .mention-chip { color:#E67E22; font-weight:600; }
 
     /* ── Rich formatting inside sanitized Zoho comment HTML ──── */
     .zoho-comment-body table { border-collapse:collapse; margin:8px 0; max-width:100%; }
@@ -886,8 +886,8 @@
     }
 
     // File-type icon/label for the attachment list (PDF, Office docs, archives, images, text)
-    function fileKind(name) {
-      const ext = (name.split('.').pop() || '').toLowerCase();
+    function fileKind(name, extHint) {
+      const ext = (extHint || name.split('.').pop() || '').toLowerCase();
       if (/^(jpe?g|png|gif|webp|bmp|heic)$/.test(ext)) return { icon: 'fa-image', label: 'Image' };
       if (ext === 'pdf')                               return { icon: 'fa-file-pdf', label: 'PDF' };
       if (/^docx?$/.test(ext))                          return { icon: 'fa-file-word', label: 'Word' };
@@ -902,7 +902,7 @@
       if (!atts || !atts.length) return '';
       return `<div style="margin-top:10px;display:flex;flex-direction:column;gap:6px">
         ${atts.map(a => {
-          const kind = fileKind(a.name);
+          const kind = fileKind(a.name, a.ext);
           const sizeLbl = a.size ? Utils.formatFileSize(a.size) : '';
           const previewBtn = (a.url && a.previewable)
             ? `<a href="${Utils.escapeHtml(a.url)}" target="_blank" rel="noopener noreferrer" title="Preview" style="color:var(--text-muted);font-size:.85rem"><i class="fa-solid fa-eye"></i></a>`
@@ -910,8 +910,17 @@
           const downloadBtn = a.url
             ? `<a href="${Utils.escapeHtml(a.url)}" download="${Utils.escapeHtml(a.name)}" target="_blank" rel="noopener noreferrer" title="Download" style="color:var(--primary);font-size:.85rem"><i class="fa-solid fa-download"></i></a>`
             : '';
+          // Try Zoho's real thumbnail first (may require an authenticated
+          // session and fail to load); fall back to the file-type icon.
+          const thumbHtml = a.previewUrl
+            ? `<div style="position:relative;width:32px;height:32px;flex-shrink:0">
+                 <img src="${Utils.escapeHtml(a.previewUrl)}" alt="" style="width:32px;height:32px;object-fit:cover;border-radius:4px;display:block"
+                      onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+                 <i class="fa-solid ${kind.icon}" style="display:none;position:absolute;inset:0;align-items:center;justify-content:center;color:var(--text-muted);font-size:.95rem"></i>
+               </div>`
+            : `<i class="fa-solid ${kind.icon}" style="color:var(--text-muted);width:16px;text-align:center;font-size:.95rem;flex-shrink:0"></i>`;
           return `<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);max-width:360px">
-            <i class="fa-solid ${kind.icon}" style="color:var(--text-muted);width:16px;text-align:center;font-size:.95rem;flex-shrink:0"></i>
+            ${thumbHtml}
             <div style="flex:1;min-width:0">
               <div style="font-size:.82rem;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${Utils.escapeHtml(a.name)}">${Utils.escapeHtml(a.name)}</div>
               <div style="font-size:.7rem;color:var(--text-muted)">${kind.label}${sizeLbl ? ' · ' + sizeLbl : ''}</div>
