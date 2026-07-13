@@ -157,7 +157,7 @@ const ZohoProjects = (() => {
   function extractEmpIds(task) {
     const text = [
       task.name || '',
-      task.description || '',
+      htmlToSpacedText(task.description || ''),
       ...(task.custom_fields || []).map(cf => String(cf.value || '')),
     ].join(' ');
 
@@ -593,6 +593,21 @@ const ZohoProjects = (() => {
     return { name: '', photo: '', id: '', email: '' };
   }
 
+  /* Flattening HTML to plain text with Utils.stripHtml alone collapses
+     adjacent block elements with no separator — e.g. a table cell pair
+     like "<td>Employee Code</td><td>RHQ-047</td>" (Zoho's real Travel
+     Advance Request Form comments use exactly this layout) becomes
+     "Employee CodeRHQ-047", which the "label + separator + value" emp-id
+     regex below can never match since there's no boundary character
+     between "Code" and "RHQ-047". Insert a space at every block/cell/row
+     boundary first so extraction sees "Employee Code RHQ-047". */
+  function htmlToSpacedText(raw) {
+    const spaced = String(raw || '')
+      .replace(/<br\s*\/?>/gi, ' ')
+      .replace(/<\/(p|div|li|tr|td|th|table|ul|ol|h[1-6]|blockquote)>/gi, '$& ');
+    return Utils.stripHtml(spaced);
+  }
+
   /* ── Fetch comments via direct API ──────────────────────── */
   async function fetchTaskComments(taskId, projectId) {
     if (!projectId) return [];
@@ -603,7 +618,7 @@ const ZohoProjects = (() => {
         // Plain-text version (for regex-based extraction elsewhere) — mentions
         // resolved to the mentioned person's name rather than dropped, so no
         // information is lost for the emp-id/approval-keyword scanners.
-        const plain = Utils.stripHtml(raw);
+        const plain = htmlToSpacedText(raw);
         const cleanContent = stripZpNoise(plain.replace(MENTION_RE, '$1')).trim();
         const { name: authorName, photo: authorPhoto, id: authorId, email: authorEmail } = resolveCommentAuthor(c);
         const rawAtts = c.attachments || c.documents || c.files || [];
