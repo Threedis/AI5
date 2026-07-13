@@ -32,6 +32,9 @@
     .approval-pending  { background:#FFF4CE; color:#7A4A00; border:1px solid #FFD97E; }
     .approval-unknown  { background:var(--bg); color:var(--text-muted); border:1px solid var(--border); }
 
+    /* ── Zoho-style @mention chip inside comment bodies ──────── */
+    .mention-chip { color:var(--primary); font-weight:600; }
+
     /* ── Summary stat row ───────────────────────────────────── */
     .vstat-row { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:16px; }
     .vstat { flex:1; min-width:100px; padding:12px 16px; border-radius:var(--radius-sm); text-align:center; }
@@ -807,27 +810,18 @@
       return `<span style="font-size:.7rem;padding:2px 7px;border-radius:var(--radius-pill);background:var(--bg);border:1px solid var(--border);color:var(--text-muted)"><i class="fa-solid ${icon}"></i> ${label}</span>`;
     };
 
-    // Render comments list (with approval highlight)
-    const APPROVAL_RE = /\bapprov(ed|al|e)\b|\bsanction(ed)?\b|\bauthori[sz]ed?\b|\bcleared?\b|\bok(?:ay)?\b|\bverified?\b|\baccept(ed)?\b|\bpaid\b/i;
-    const REJECT_RE   = /\breject(ed)?\b|\bdenied?\b|\bdeclined?\b|\bcancell?ed?\b/i;
-    const comments    = isZoho ? (parsed.comments || []) : [];
+    // Render comments list — mirrors Zoho's own Approval Details → Comments tab
+    const rawComments = isZoho ? (parsed.comments || []) : [];
+    // Newest first, matching Zoho's own comment order (display concern only —
+    // parsed.comments itself stays in API order for the approval-derivation logic upstream)
+    const comments = rawComments.slice().sort((a, b) => toEpochMs(b.createdAt) - toEpochMs(a.createdAt));
 
-    // Human-readable relative time (e.g. "2 days ago")
-    function relTime(raw) {
-      if (!raw) return '';
-      // Zoho time_long is epoch in milliseconds
-      const ms  = Number(raw);
-      const d   = ms > 1e10 ? new Date(ms) : new Date(raw);
-      if (isNaN(d)) return '';
-      const diff = Date.now() - d.getTime();
-      const mins = Math.floor(diff / 60000);
-      if (mins < 1)   return 'just now';
-      if (mins < 60)  return `${mins}m ago`;
-      const hrs = Math.floor(mins / 60);
-      if (hrs  < 24)  return `${hrs}h ago`;
-      const days = Math.floor(hrs / 24);
-      if (days < 7)   return `${days}d ago`;
-      return d.toLocaleDateString(undefined, { day:'numeric', month:'short', year:'numeric' });
+    function toEpochMs(raw) {
+      if (!raw) return 0;
+      const n = Number(raw);
+      if (!isNaN(n) && n > 1e10) return n;
+      const d = new Date(raw);
+      return isNaN(d) ? 0 : d.getTime();
     }
 
     // Initials avatar colour (consistent per name)
@@ -842,67 +836,55 @@
       return (name || '?').split(/\s+/).slice(0,2).map(w => w[0]).join('').toUpperCase();
     }
 
-    // Format comment body: detect key:value lines → table, otherwise paragraphs
-    function formatCommentBody(raw) {
-      const text  = Utils.stripHtml(raw || '').trim();
-      const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    // Zoho-style absolute timestamp: "06/07/2026 10:41 AM"
+    function formatCommentTime(raw) {
+      const ms = toEpochMs(raw);
+      if (!ms) return '';
+      const d  = new Date(ms);
+      const dd = String(d.getDate()).padStart(2,'0');
+      const mm = String(d.getMonth()+1).padStart(2,'0');
+      let h    = d.getHours();
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      h = h % 12; if (h === 0) h = 12;
+      const min = String(d.getMinutes()).padStart(2,'0');
+      return `${dd}/${mm}/${d.getFullYear()} ${String(h).padStart(2,'0')}:${min} ${ampm}`;
+    }
 
-      // Detect key:value pattern (e.g. "Employee Name: Ramniwash")
-      const kvLines = lines.filter(l => /^[^:]{2,40}:\s*.+/.test(l));
-      const isKvTable = kvLines.length >= 3 && kvLines.length >= lines.length * 0.5;
-
-      if (isKvTable) {
-        const rows = lines.map(l => {
-          const m = l.match(/^([^:]{2,40}):\s*(.+)/);
-          if (m) return `<tr><td style="padding:4px 10px 4px 0;font-size:.78rem;color:var(--text-muted);font-weight:600;white-space:nowrap;vertical-align:top">${Utils.escapeHtml(m[1].trim())}</td><td style="padding:4px 0;font-size:.82rem;color:var(--text);vertical-align:top">${Utils.escapeHtml(m[2].trim())}</td></tr>`;
-          return `<tr><td colspan="2" style="padding:4px 0;font-size:.82rem;color:var(--text)">${Utils.escapeHtml(l)}</td></tr>`;
-        }).join('');
-        return `<table style="border-collapse:collapse;width:100%">${rows}</table>`;
-      }
-
-      // Plain paragraphs: group non-empty lines into paragraphs
-      return lines.map(l => `<p style="margin:0 0 6px 0;font-size:.84rem;color:var(--text);line-height:1.6">${Utils.escapeHtml(l)}</p>`).join('');
+    function commentAttachmentsHtml(atts) {
+      if (!atts || !atts.length) return '';
+      return `<div style="margin-top:8px;display:flex;flex-direction:column;gap:5px">
+        ${atts.map(a => {
+          const icon  = a.isImage ? 'fa-image' : 'fa-paperclip';
+          const sizeLbl = a.size ? ` <span style="color:var(--text-muted)">(${Utils.formatFileSize(a.size)})</span>` : '';
+          const inner = `<i class="fa-solid ${icon}" style="color:var(--text-muted);width:14px;text-align:center"></i><span style="font-size:.82rem;color:var(--primary);text-decoration:underline">${Utils.escapeHtml(a.name)}</span>${sizeLbl}`;
+          return a.url
+            ? `<a href="${Utils.escapeHtml(a.url)}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:6px;text-decoration:none;width:fit-content">${inner}</a>`
+            : `<div style="display:inline-flex;align-items:center;gap:6px;width:fit-content">${inner}</div>`;
+        }).join('')}
+      </div>`;
     }
 
     const commentsHtml = comments.length ? `
       <div style="margin-top:18px">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
-          <i class="fa-solid fa-comments" style="color:var(--primary)"></i>
-          <span style="font-weight:700;font-size:.9rem">Comments</span>
-          <span style="background:var(--primary);color:#fff;border-radius:99px;font-size:.7rem;font-weight:700;padding:1px 8px">${comments.length}</span>
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;padding-bottom:8px;border-bottom:2px solid var(--primary)">
+          <i class="fa-solid fa-comments" style="color:var(--text-muted)"></i>
+          <span style="font-weight:700;font-size:.9rem;color:var(--text)">Comments (${comments.length})</span>
         </div>
-        <div style="display:flex;flex-direction:column;gap:14px;max-height:480px;overflow-y:auto;padding-right:4px">
-          ${comments.map(c => {
-            const isApproval = APPROVAL_RE.test(c.content);
-            const isReject   = REJECT_RE.test(c.content);
-            const name       = c.author || 'Team Member';
-            const ini        = initials(name);
-            const avatarBg   = avatarColor(name);
-            const relT       = relTime(c.createdAt);
-            const absT       = (() => {
-              const ms = Number(c.createdAt);
-              const d  = ms > 1e10 ? new Date(ms) : new Date(c.createdAt || '');
-              return isNaN(d) ? '' : d.toLocaleString();
-            })();
-            const borderColor = isApproval ? '#4CAF50' : isReject ? '#f44336' : 'var(--border)';
-            const topBar      = isApproval ? 'background:#4CAF50' : isReject ? 'background:#f44336' : 'display:none';
-            const badge       = isApproval
-              ? `<span style="display:inline-flex;align-items:center;gap:4px;font-size:.72rem;font-weight:700;color:#fff;background:#4CAF50;border-radius:99px;padding:2px 10px"><i class="fa-solid fa-circle-check"></i> Approved</span>`
-              : isReject
-              ? `<span style="display:inline-flex;align-items:center;gap:4px;font-size:.72rem;font-weight:700;color:#fff;background:#f44336;border-radius:99px;padding:2px 10px"><i class="fa-solid fa-circle-xmark"></i> Rejected</span>`
-              : '';
+        <div style="display:flex;flex-direction:column;max-height:520px;overflow-y:auto;padding-right:4px">
+          ${comments.map((c, i) => {
+            const name  = c.author || 'Team Member';
+            const ini   = initials(name);
+            const avatarBg = avatarColor(name);
+            const timeLbl  = formatCommentTime(c.createdAt);
             return `
-            <div style="display:flex;gap:10px;align-items:flex-start">
-              <div title="${Utils.escapeHtml(name)}" style="flex-shrink:0;width:36px;height:36px;border-radius:50%;background:${avatarBg};color:#fff;display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:700">${ini}</div>
+            <div style="display:flex;gap:12px;align-items:flex-start;padding:14px 0;${i < comments.length - 1 ? 'border-bottom:1px solid var(--border)' : ''}">
+              <div title="${Utils.escapeHtml(name)}" style="flex-shrink:0;width:40px;height:40px;border-radius:50%;background:${avatarBg};color:#fff;display:flex;align-items:center;justify-content:center;font-size:.8rem;font-weight:700">${ini}</div>
               <div style="flex:1;min-width:0">
-                <div style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:6px">
-                  <span style="font-weight:700;font-size:.88rem;color:var(--text)">${Utils.escapeHtml(name)}</span>
-                  ${relT ? `<span style="font-size:.74rem;color:var(--text-muted)" title="${Utils.escapeHtml(absT)}">${relT}</span>` : ''}
-                  ${badge}
-                </div>
-                <div style="border:1px solid ${borderColor};border-radius:10px;border-top-left-radius:2px;overflow:hidden">
-                  ${isApproval || isReject ? `<div style="height:3px;${topBar}"></div>` : ''}
-                  <div style="padding:11px 14px">${formatCommentBody(c.content)}</div>
+                <div style="font-weight:700;font-size:.88rem;color:var(--text)">${Utils.escapeHtml(name)}</div>
+                <div style="font-size:.86rem;color:var(--text);line-height:1.6;white-space:pre-wrap;word-break:break-word;margin-top:4px">${c.contentHtml || Utils.escapeHtml(c.content)}</div>
+                ${commentAttachmentsHtml(c.attachments)}
+                <div style="margin-top:8px;font-size:.76rem;color:var(--text-muted)">
+                  ${Utils.escapeHtml(timeLbl)}${c.isEdited ? ' · <em>Edited</em>' : ''} · <span style="color:var(--text-muted)">Like</span>
                 </div>
               </div>
             </div>`;
