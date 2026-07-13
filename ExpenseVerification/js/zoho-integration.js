@@ -443,8 +443,18 @@ const ZohoProjects = (() => {
   const ALLOWED_TAGS = new Set(['B','STRONG','I','EM','U','BR','P','DIV','SPAN','UL','OL','LI','A']);
   const VOID_TAGS    = new Set(['BR']);
 
+  /* Zoho's rich-text editor represents an @mention as a non-text widget
+     (e.g. an avatar <img>/custom tag) sandwiched between literal "zp"
+     boundary markers with no recoverable name in this field — e.g. the
+     raw HTML is "zp<img ...>zp Approve plz". Once the widget tag is
+     dropped by the sanitizer above, the two "zp" markers are left
+     stranded as plain text and must be stripped too. */
+  function stripZpNoise(text) {
+    return text.replace(/\bzp\s*zp\b/gi, '').replace(/\bzp\b/gi, '');
+  }
+
   function renderMentionText(text) {
-    return Utils.escapeHtml(text.replace(MENTION_RE, ''));
+    return Utils.escapeHtml(stripZpNoise(text.replace(MENTION_RE, '')));
   }
 
   function sanitizeNode(node) {
@@ -481,12 +491,18 @@ const ZohoProjects = (() => {
   function cleanAuthorName(raw) {
     let s = stripZpWrap(raw);
     s = s.replace(/\[?@zpuser#\d+#([^\]]*)\]?/gi, '$1').trim();
+    s = stripZpNoise(s).trim();
     return s && isNaN(s) ? s : '';
   }
 
-  /* ── Resolve a comment's author from whichever field Zoho populated ── */
+  /* ── Resolve a comment's author from whichever field Zoho populated ──
+     Checks both snake_case and camelCase variants, and object vs flat
+     sibling-field shapes, since the exact live payload shape is unconfirmed. ── */
   function resolveCommentAuthor(c) {
-    const candidates = [c.created_by, c.added_by, c.author, c.user];
+    const candidates = [
+      c.created_by, c.createdBy, c.added_by, c.addedBy,
+      c.author, c.user, c.commented_by, c.owner,
+    ];
     for (const cand of candidates) {
       if (!cand) continue;
       if (typeof cand === 'string') {
@@ -495,10 +511,19 @@ const ZohoProjects = (() => {
         continue;
       }
       const name = cleanAuthorName(cand.name) || cleanAuthorName(cand.display_name) ||
-                   cleanAuthorName(cand.full_name) ||
+                   cleanAuthorName(cand.full_name) || cleanAuthorName(cand.first_name) ||
                    (cand.email ? String(cand.email).split('@')[0] : '');
-      if (name) return { name, photo: cand.photo || cand.photo_url || cand.image || '', id: cand.id || cand.zpuid || '' };
+      if (name) {
+        const photo = cand.photo || cand.photo_url || cand.image || cand.avatar || cand.profile_image || '';
+        return { name, photo, id: cand.id || cand.zpuid || '' };
+      }
     }
+    // Flat sibling fields as a last resort (e.g. c.created_by_name / c.author_name)
+    const flatName = cleanAuthorName(c.created_by_name || c.createdByName || c.author_name || c.user_name || '');
+    if (flatName) {
+      return { name: flatName, photo: c.created_by_photo || c.author_photo || '', id: '' };
+    }
+    console.debug('[Zoho] could not resolve comment author from payload:', c);
     return { name: '', photo: '', id: '' };
   }
 
@@ -511,7 +536,7 @@ const ZohoProjects = (() => {
         const raw = c.comment ?? c.content ?? '';
         // Plain-text version (for regex-based extraction elsewhere) — mentions fully stripped
         const plain = Utils.stripHtml(raw);
-        const cleanContent = plain.trim().replace(/\[?@zpuser#\d+#[^\]]*\]?/g, '').trim();
+        const cleanContent = stripZpNoise(plain.replace(/\[?@zpuser#\d+#[^\]]*\]?/g, '')).trim();
         const { name: authorName, photo: authorPhoto, id: authorId } = resolveCommentAuthor(c);
         const rawAtts = c.attachments || c.documents || c.files || [];
         const attachments = rawAtts.map(a => ({
