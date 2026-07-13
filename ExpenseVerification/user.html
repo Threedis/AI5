@@ -811,9 +811,6 @@
     };
 
     // Render comments list — mirrors Zoho's own Approval Details → Comments tab.
-    // Kept in the exact order the API returns them, with no client-side re-sort.
-    const comments = isZoho ? (parsed.comments || []) : [];
-
     function toEpochMs(raw) {
       if (!raw) return 0;
       const n = Number(raw);
@@ -821,6 +818,12 @@
       const d = new Date(raw);
       return isNaN(d) ? 0 : d.getTime();
     }
+
+    // Zoho's own UI sorts by most-recent activity (an edit counts as new
+    // activity, so an edited comment can outrank a newer, never-edited one —
+    // confirmed against a live task where this is exactly what happens).
+    const rawComments = isZoho ? (parsed.comments || []) : [];
+    const comments = rawComments.slice().sort((a, b) => toEpochMs(b.createdAt) - toEpochMs(a.createdAt));
 
     // Initials avatar colour (consistent per name)
     function avatarColor(name) {

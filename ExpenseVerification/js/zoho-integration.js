@@ -545,15 +545,23 @@ const ZohoProjects = (() => {
           url:     a.download_url || a.url || a.file_url || a.link || a.href || '',
           isImage: /\.(jpe?g|png|gif|webp|bmp|heic)$/i.test(a.filename || a.file_name || a.name || a.title || ''),
         }));
+        // Zoho only sets updated_time when a comment was actually edited after
+        // creation (it otherwise equals created_time exactly); when edited, its
+        // own UI shows the edit time as the comment's timestamp, not the
+        // original post time — confirmed against a live task's raw API response.
+        const createdRaw = c.created_time || c.time_long || c.added_time_string || '';
+        const updatedRaw = c.updated_time || c.last_modified_time || '';
+        const edited = !!(updatedRaw && createdRaw && updatedRaw !== createdRaw);
         return {
+          id:          c.id || c.comment_id || '',
           author:      authorName,
           authorPhoto,
           authorId,
           content:     cleanContent,
           contentHtml: sanitizeCommentHtml(raw),
           attachments,
-          isEdited:    !!(c.edited ?? c.is_edited ?? c.edited_time_long ?? c.edited_time_string),
-          createdAt:   c.created_time || c.time_long || c.added_time_string || '',
+          isEdited:    edited || !!(c.edited ?? c.is_edited),
+          createdAt:   edited ? updatedRaw : createdRaw,
         };
       });
     } catch { return []; }
