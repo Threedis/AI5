@@ -35,6 +35,36 @@
     /* ── Zoho-style @mention chip inside comment bodies ──────── */
     .mention-chip { color:var(--primary); font-weight:600; }
 
+    /* ── Rich formatting inside sanitized Zoho comment HTML ──── */
+    .zoho-comment-body table { border-collapse:collapse; margin:8px 0; max-width:100%; }
+    .zoho-comment-body td, .zoho-comment-body th {
+      border:1px solid var(--border); padding:6px 10px; font-size:.84rem; text-align:left;
+    }
+    .zoho-comment-body th { background:var(--bg); font-weight:700; }
+    .zoho-comment-body blockquote {
+      margin:8px 0; padding:4px 12px; border-left:3px solid var(--border); color:var(--text-muted);
+    }
+    .zoho-comment-body code {
+      background:var(--bg); border-radius:4px; padding:1px 5px;
+      font-family:var(--font-mono, monospace); font-size:.82rem;
+    }
+    .zoho-comment-body pre {
+      background:var(--bg); border-radius:6px; padding:8px 10px; overflow-x:auto;
+      font-family:var(--font-mono, monospace); font-size:.82rem;
+    }
+    .zoho-comment-body a { color:var(--primary); }
+    .zoho-comment-body ul, .zoho-comment-body ol { margin:4px 0 4px 20px; }
+    .zoho-comment-body hr { border:none; border-top:1px solid var(--border); margin:8px 0; }
+    .comment-img-link { display:inline-block; margin:6px 6px 0 0; }
+    .comment-inline-img {
+      max-width:260px; max-height:260px; width:auto; height:auto;
+      border-radius:8px; border:1px solid var(--border); cursor:zoom-in;
+      display:block; object-fit:cover;
+    }
+    @media (max-width:480px) {
+      .comment-inline-img { max-width:180px; max-height:180px; }
+    }
+
     /* ── Summary stat row ───────────────────────────────────── */
     .vstat-row { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:16px; }
     .vstat { flex:1; min-width:100px; padding:12px 16px; border-radius:var(--radius-sm); text-align:center; }
@@ -819,11 +849,15 @@
       return isNaN(d) ? 0 : d.getTime();
     }
 
+    // The timestamp Zoho actually displays/sorts by: the edit time when a
+    // comment has been edited, otherwise its original creation time —
+    // confirmed against a live task where this is exactly what happens.
+    function displayTime(c) { return c.isEdited ? (c.updatedAt || c.createdAt) : c.createdAt; }
+
     // Zoho's own UI sorts by most-recent activity (an edit counts as new
-    // activity, so an edited comment can outrank a newer, never-edited one —
-    // confirmed against a live task where this is exactly what happens).
+    // activity, so an edited comment can outrank a newer, never-edited one).
     const rawComments = isZoho ? (parsed.comments || []) : [];
-    const comments = rawComments.slice().sort((a, b) => toEpochMs(b.createdAt) - toEpochMs(a.createdAt));
+    const comments = rawComments.slice().sort((a, b) => toEpochMs(displayTime(b)) - toEpochMs(displayTime(a)));
 
     // Initials avatar colour (consistent per name)
     function avatarColor(name) {
@@ -851,16 +885,39 @@
       return `${dd}/${mm}/${d.getFullYear()} ${String(h).padStart(2,'0')}:${min} ${ampm}`;
     }
 
+    // File-type icon/label for the attachment list (PDF, Office docs, archives, images, text)
+    function fileKind(name) {
+      const ext = (name.split('.').pop() || '').toLowerCase();
+      if (/^(jpe?g|png|gif|webp|bmp|heic)$/.test(ext)) return { icon: 'fa-image', label: 'Image' };
+      if (ext === 'pdf')                               return { icon: 'fa-file-pdf', label: 'PDF' };
+      if (/^docx?$/.test(ext))                          return { icon: 'fa-file-word', label: 'Word' };
+      if (/^xlsx?$/.test(ext))                          return { icon: 'fa-file-excel', label: 'Excel' };
+      if (/^pptx?$/.test(ext))                          return { icon: 'fa-file-powerpoint', label: 'PowerPoint' };
+      if (/^(zip|rar|7z)$/.test(ext))                   return { icon: 'fa-file-zipper', label: 'Archive' };
+      if (ext === 'txt')                                return { icon: 'fa-file-lines', label: 'Text' };
+      return { icon: 'fa-file', label: 'File' };
+    }
+
     function commentAttachmentsHtml(atts) {
       if (!atts || !atts.length) return '';
-      return `<div style="margin-top:8px;display:flex;flex-direction:column;gap:5px">
+      return `<div style="margin-top:10px;display:flex;flex-direction:column;gap:6px">
         ${atts.map(a => {
-          const icon  = a.isImage ? 'fa-image' : 'fa-paperclip';
-          const sizeLbl = a.size ? ` <span style="color:var(--text-muted)">(${Utils.formatFileSize(a.size)})</span>` : '';
-          const inner = `<i class="fa-solid ${icon}" style="color:var(--text-muted);width:14px;text-align:center"></i><span style="font-size:.82rem;color:var(--primary);text-decoration:underline">${Utils.escapeHtml(a.name)}</span>${sizeLbl}`;
-          return a.url
-            ? `<a href="${Utils.escapeHtml(a.url)}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:6px;text-decoration:none;width:fit-content">${inner}</a>`
-            : `<div style="display:inline-flex;align-items:center;gap:6px;width:fit-content">${inner}</div>`;
+          const kind = fileKind(a.name);
+          const sizeLbl = a.size ? Utils.formatFileSize(a.size) : '';
+          const previewBtn = (a.url && a.previewable)
+            ? `<a href="${Utils.escapeHtml(a.url)}" target="_blank" rel="noopener noreferrer" title="Preview" style="color:var(--text-muted);font-size:.85rem"><i class="fa-solid fa-eye"></i></a>`
+            : '';
+          const downloadBtn = a.url
+            ? `<a href="${Utils.escapeHtml(a.url)}" download="${Utils.escapeHtml(a.name)}" target="_blank" rel="noopener noreferrer" title="Download" style="color:var(--primary);font-size:.85rem"><i class="fa-solid fa-download"></i></a>`
+            : '';
+          return `<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);max-width:360px">
+            <i class="fa-solid ${kind.icon}" style="color:var(--text-muted);width:16px;text-align:center;font-size:.95rem;flex-shrink:0"></i>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:.82rem;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${Utils.escapeHtml(a.name)}">${Utils.escapeHtml(a.name)}</div>
+              <div style="font-size:.7rem;color:var(--text-muted)">${kind.label}${sizeLbl ? ' · ' + sizeLbl : ''}</div>
+            </div>
+            ${previewBtn}${downloadBtn}
+          </div>`;
         }).join('')}
       </div>`;
     }
@@ -876,7 +933,7 @@
             const name  = c.author || '';
             const ini   = initials(name);
             const avatarBg = avatarColor(name || '?');
-            const timeLbl  = formatCommentTime(c.createdAt);
+            const timeLbl  = formatCommentTime(displayTime(c));
             const avatarHtml = c.authorPhoto
               ? `<div style="position:relative;flex-shrink:0;width:40px;height:40px">
                    <img src="${Utils.escapeHtml(c.authorPhoto)}" alt="" title="${Utils.escapeHtml(name)}" style="width:40px;height:40px;border-radius:50%;object-fit:cover;display:block"
@@ -889,7 +946,7 @@
               ${avatarHtml}
               <div style="flex:1;min-width:0">
                 <div style="font-weight:700;font-size:.88rem;color:var(--text)">${Utils.escapeHtml(name)}</div>
-                <div style="font-size:.86rem;color:var(--text);line-height:1.6;white-space:pre-wrap;word-break:break-word;margin-top:4px">${c.contentHtml || Utils.escapeHtml(c.content)}</div>
+                <div class="zoho-comment-body" style="font-size:.86rem;color:var(--text);line-height:1.6;white-space:pre-wrap;word-break:break-word;margin-top:4px">${c.contentHtml || Utils.escapeHtml(c.content)}</div>
                 ${commentAttachmentsHtml(c.attachments)}
                 <div style="margin-top:8px;font-size:.76rem;color:var(--text-muted)">
                   ${Utils.escapeHtml(timeLbl)}${c.isEdited ? ' • <em>Edited</em>' : ''} • <span style="color:var(--text-muted)">Like</span>

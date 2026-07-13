@@ -434,14 +434,20 @@ const ZohoProjects = (() => {
   }
 
   /* ── Sanitize Zoho's rich-text comment HTML for safe display ──
-     Keeps formatting tags (bold/italic/lists/line breaks) and safe
-     links; drops everything else but preserves its text content.
-     [@zpuser#id#Name] mentions are dropped entirely (Zoho re-shows
-     the author's name in the comment header already — keeping the
-     mention inline would just duplicate it). ── */
+     Renders the real HTML Zoho stores (tables, images, lists, inline
+     styles, links, headings, code blocks) instead of flattening it to
+     plain text — only script/style tags, unsafe URL schemes, and
+     unrecognised CSS properties are stripped. [@zpuser#id#Name]
+     mentions are dropped entirely (Zoho re-shows the author's name in
+     the comment header already — keeping the mention inline would
+     just duplicate it). ── */
   const MENTION_RE   = /\[?@zpuser#\d+#[^\]]*\]?\s*/g;
-  const ALLOWED_TAGS = new Set(['B','STRONG','I','EM','U','BR','P','DIV','SPAN','UL','OL','LI','A']);
-  const VOID_TAGS    = new Set(['BR']);
+  const ALLOWED_TAGS = new Set([
+    'B','STRONG','I','EM','U','S','STRIKE','BR','P','DIV','SPAN',
+    'UL','OL','LI','A','IMG','TABLE','THEAD','TBODY','TFOOT','TR','TD','TH',
+    'BLOCKQUOTE','CODE','PRE','H1','H2','H3','H4','H5','H6','HR','SUB','SUP',
+  ]);
+  const VOID_TAGS = new Set(['BR','IMG','HR']);
 
   /* Zoho's rich-text editor represents an @mention as a non-text widget
      (e.g. an avatar <img>/custom tag) sandwiched between literal "zp"
@@ -457,6 +463,35 @@ const ZohoProjects = (() => {
     return Utils.escapeHtml(stripZpNoise(text.replace(MENTION_RE, '')));
   }
 
+  /* Allowlist of CSS properties safe to carry over from Zoho's inline
+     styles (colors, spacing, table borders) — rejects anything that
+     could smuggle a URL/expression (background-image exfiltration,
+     old-IE expression() XSS, @import, etc). */
+  const SAFE_CSS_PROPS = new Set([
+    'color','background','background-color','font-weight','font-style','font-size',
+    'text-decoration','text-align','text-transform','line-height','letter-spacing',
+    'border','border-color','border-width','border-style','border-collapse',
+    'padding','padding-top','padding-bottom','padding-left','padding-right',
+    'margin','margin-top','margin-bottom','margin-left','margin-right',
+    'width','max-width','height','max-height','vertical-align','white-space',
+  ]);
+  function sanitizeStyle(raw) {
+    if (!raw) return '';
+    return String(raw).split(';').map(rule => {
+      const idx = rule.indexOf(':');
+      if (idx < 0) return '';
+      const prop = rule.slice(0, idx).trim().toLowerCase();
+      const val  = rule.slice(idx + 1).trim();
+      if (!SAFE_CSS_PROPS.has(prop)) return '';
+      if (/url\s*\(|expression\s*\(|javascript:|@import/i.test(val)) return '';
+      return `${prop}:${val}`;
+    }).filter(Boolean).join(';');
+  }
+  function styleAttr(node) {
+    const style = sanitizeStyle(node.getAttribute('style') || '');
+    return style ? ` style="${Utils.escapeHtml(style)}"` : '';
+  }
+
   function sanitizeNode(node) {
     if (node.nodeType === Node.TEXT_NODE) return renderMentionText(node.nodeValue || '');
     if (node.nodeType !== Node.ELEMENT_NODE) return '';
@@ -464,15 +499,34 @@ const ZohoProjects = (() => {
     if (tag === 'SCRIPT' || tag === 'STYLE') return '';
     const inner = Array.from(node.childNodes).map(sanitizeNode).join('');
     if (!ALLOWED_TAGS.has(tag)) return inner;
-    if (VOID_TAGS.has(tag)) return '<br>';
+    if (tag === 'BR') return '<br>';
+    if (tag === 'HR') return '<hr>';
+
+    if (tag === 'IMG') {
+      const src = node.getAttribute('src') || '';
+      const safeSrc = /^(https?:|data:image\/)/i.test(src) ? src : '';
+      if (!safeSrc) return '';
+      const alt = Utils.escapeHtml(node.getAttribute('alt') || 'Comment image');
+      return `<a href="${Utils.escapeHtml(safeSrc)}" target="_blank" rel="noopener noreferrer" class="comment-img-link">` +
+             `<img src="${Utils.escapeHtml(safeSrc)}" alt="${alt}" loading="lazy" class="comment-inline-img"${styleAttr(node)}></a>`;
+    }
+
     if (tag === 'A') {
       const href = node.getAttribute('href') || '';
       const safe = /^(https?:|mailto:)/i.test(href) ? href : '';
       return safe
-        ? `<a href="${Utils.escapeHtml(safe)}" target="_blank" rel="noopener noreferrer">${inner}</a>`
+        ? `<a href="${Utils.escapeHtml(safe)}" target="_blank" rel="noopener noreferrer"${styleAttr(node)}>${inner}</a>`
         : inner;
     }
-    return `<${tag.toLowerCase()}>${inner}</${tag.toLowerCase()}>`;
+
+    if (tag === 'TD' || tag === 'TH') {
+      const t = tag.toLowerCase();
+      const colspan = /^\d+$/.test(node.getAttribute('colspan') || '') ? ` colspan="${node.getAttribute('colspan')}"` : '';
+      const rowspan = /^\d+$/.test(node.getAttribute('rowspan') || '') ? ` rowspan="${node.getAttribute('rowspan')}"` : '';
+      return `<${t}${colspan}${rowspan}${styleAttr(node)}>${inner}</${t}>`;
+    }
+
+    return `<${tag.toLowerCase()}${styleAttr(node)}>${inner}</${tag.toLowerCase()}>`;
   }
 
   function sanitizeCommentHtml(raw) {
@@ -507,7 +561,7 @@ const ZohoProjects = (() => {
       if (!cand) continue;
       if (typeof cand === 'string') {
         const name = cleanAuthorName(cand);
-        if (name) return { name, photo: '', id: '' };
+        if (name) return { name, photo: '', id: '', email: '' };
         continue;
       }
       const name = cleanAuthorName(cand.name) || cleanAuthorName(cand.display_name) ||
@@ -515,16 +569,16 @@ const ZohoProjects = (() => {
                    (cand.email ? String(cand.email).split('@')[0] : '');
       if (name) {
         const photo = cand.photo || cand.photo_url || cand.image || cand.avatar || cand.profile_image || '';
-        return { name, photo, id: cand.id || cand.zpuid || '' };
+        return { name, photo, id: cand.id || cand.zpuid || '', email: cand.email || '' };
       }
     }
     // Flat sibling fields as a last resort (e.g. c.created_by_name / c.author_name)
     const flatName = cleanAuthorName(c.created_by_name || c.createdByName || c.author_name || c.user_name || '');
     if (flatName) {
-      return { name: flatName, photo: c.created_by_photo || c.author_photo || '', id: '' };
+      return { name: flatName, photo: c.created_by_photo || c.author_photo || '', id: '', email: '' };
     }
     console.debug('[Zoho] could not resolve comment author from payload:', c);
-    return { name: '', photo: '', id: '' };
+    return { name: '', photo: '', id: '', email: '' };
   }
 
   /* ── Fetch comments via direct API ──────────────────────── */
@@ -537,31 +591,38 @@ const ZohoProjects = (() => {
         // Plain-text version (for regex-based extraction elsewhere) — mentions fully stripped
         const plain = Utils.stripHtml(raw);
         const cleanContent = stripZpNoise(plain.replace(/\[?@zpuser#\d+#[^\]]*\]?/g, '')).trim();
-        const { name: authorName, photo: authorPhoto, id: authorId } = resolveCommentAuthor(c);
+        const { name: authorName, photo: authorPhoto, id: authorId, email: authorEmail } = resolveCommentAuthor(c);
         const rawAtts = c.attachments || c.documents || c.files || [];
-        const attachments = rawAtts.map(a => ({
-          name:    a.filename || a.file_name || a.name || a.title || 'Attachment',
-          size:    a.filesize || a.file_size || a.size || 0,
-          url:     a.download_url || a.url || a.file_url || a.link || a.href || '',
-          isImage: /\.(jpe?g|png|gif|webp|bmp|heic)$/i.test(a.filename || a.file_name || a.name || a.title || ''),
-        }));
+        const attachments = rawAtts.map(a => {
+          const name = a.filename || a.file_name || a.name || a.title || 'Attachment';
+          const ext  = (name.split('.').pop() || '').toLowerCase();
+          return {
+            name,
+            size:        a.filesize || a.file_size || a.size || 0,
+            url:         a.download_url || a.url || a.file_url || a.link || a.href || '',
+            isImage:     /^(jpe?g|png|gif|webp|bmp|heic)$/.test(ext),
+            previewable: /^(jpe?g|png|gif|webp|bmp|heic|pdf)$/.test(ext),
+          };
+        });
         // Zoho only sets updated_time when a comment was actually edited after
         // creation (it otherwise equals created_time exactly); when edited, its
         // own UI shows the edit time as the comment's timestamp, not the
         // original post time — confirmed against a live task's raw API response.
         const createdRaw = c.created_time || c.time_long || c.added_time_string || '';
         const updatedRaw = c.updated_time || c.last_modified_time || '';
-        const edited = !!(updatedRaw && createdRaw && updatedRaw !== createdRaw);
+        const edited = !!(updatedRaw && createdRaw && updatedRaw !== createdRaw) || !!(c.edited ?? c.is_edited);
         return {
           id:          c.id || c.comment_id || '',
           author:      authorName,
+          authorEmail,
           authorPhoto,
           authorId,
           content:     cleanContent,
           contentHtml: sanitizeCommentHtml(raw),
           attachments,
-          isEdited:    edited || !!(c.edited ?? c.is_edited),
-          createdAt:   edited ? updatedRaw : createdRaw,
+          isEdited:    edited,
+          createdAt:   createdRaw,
+          updatedAt:   updatedRaw || createdRaw,
         };
       });
     } catch { return []; }
