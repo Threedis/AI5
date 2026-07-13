@@ -810,11 +810,9 @@
       return `<span style="font-size:.7rem;padding:2px 7px;border-radius:var(--radius-pill);background:var(--bg);border:1px solid var(--border);color:var(--text-muted)"><i class="fa-solid ${icon}"></i> ${label}</span>`;
     };
 
-    // Render comments list — mirrors Zoho's own Approval Details → Comments tab
-    const rawComments = isZoho ? (parsed.comments || []) : [];
-    // Newest first, matching Zoho's own comment order (display concern only —
-    // parsed.comments itself stays in API order for the approval-derivation logic upstream)
-    const comments = rawComments.slice().sort((a, b) => toEpochMs(b.createdAt) - toEpochMs(a.createdAt));
+    // Render comments list — mirrors Zoho's own Approval Details → Comments tab.
+    // Kept in the exact order the API returns them, with no client-side re-sort.
+    const comments = isZoho ? (parsed.comments || []) : [];
 
     function toEpochMs(raw) {
       if (!raw) return 0;
@@ -872,19 +870,26 @@
         </div>
         <div style="display:flex;flex-direction:column;max-height:520px;overflow-y:auto;padding-right:4px">
           ${comments.map((c, i) => {
-            const name  = c.author || 'Team Member';
+            const name  = c.author || '';
             const ini   = initials(name);
-            const avatarBg = avatarColor(name);
+            const avatarBg = avatarColor(name || '?');
             const timeLbl  = formatCommentTime(c.createdAt);
+            const avatarHtml = c.authorPhoto
+              ? `<div style="position:relative;flex-shrink:0;width:40px;height:40px">
+                   <img src="${Utils.escapeHtml(c.authorPhoto)}" alt="" title="${Utils.escapeHtml(name)}" style="width:40px;height:40px;border-radius:50%;object-fit:cover;display:block"
+                        onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+                   <div style="display:none;position:absolute;inset:0;border-radius:50%;background:${avatarBg};color:#fff;align-items:center;justify-content:center;font-size:.8rem;font-weight:700">${ini}</div>
+                 </div>`
+              : `<div title="${Utils.escapeHtml(name)}" style="flex-shrink:0;width:40px;height:40px;border-radius:50%;background:${avatarBg};color:#fff;display:flex;align-items:center;justify-content:center;font-size:.8rem;font-weight:700">${ini}</div>`;
             return `
             <div style="display:flex;gap:12px;align-items:flex-start;padding:14px 0;${i < comments.length - 1 ? 'border-bottom:1px solid var(--border)' : ''}">
-              <div title="${Utils.escapeHtml(name)}" style="flex-shrink:0;width:40px;height:40px;border-radius:50%;background:${avatarBg};color:#fff;display:flex;align-items:center;justify-content:center;font-size:.8rem;font-weight:700">${ini}</div>
+              ${avatarHtml}
               <div style="flex:1;min-width:0">
                 <div style="font-weight:700;font-size:.88rem;color:var(--text)">${Utils.escapeHtml(name)}</div>
                 <div style="font-size:.86rem;color:var(--text);line-height:1.6;white-space:pre-wrap;word-break:break-word;margin-top:4px">${c.contentHtml || Utils.escapeHtml(c.content)}</div>
                 ${commentAttachmentsHtml(c.attachments)}
                 <div style="margin-top:8px;font-size:.76rem;color:var(--text-muted)">
-                  ${Utils.escapeHtml(timeLbl)}${c.isEdited ? ' · <em>Edited</em>' : ''} · <span style="color:var(--text-muted)">Like</span>
+                  ${Utils.escapeHtml(timeLbl)}${c.isEdited ? ' • <em>Edited</em>' : ''} • <span style="color:var(--text-muted)">Like</span>
                 </div>
               </div>
             </div>`;

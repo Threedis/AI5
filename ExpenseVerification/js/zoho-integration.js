@@ -436,22 +436,15 @@ const ZohoProjects = (() => {
   /* ── Sanitize Zoho's rich-text comment HTML for safe display ──
      Keeps formatting tags (bold/italic/lists/line breaks) and safe
      links; drops everything else but preserves its text content.
-     Resolves [@zpuser#id#Name] mention syntax to the plain name. ── */
-  const MENTION_RE   = /\[?@zpuser#\d+#([^\]]*)\]?/g;
+     [@zpuser#id#Name] mentions are dropped entirely (Zoho re-shows
+     the author's name in the comment header already — keeping the
+     mention inline would just duplicate it). ── */
+  const MENTION_RE   = /\[?@zpuser#\d+#[^\]]*\]?\s*/g;
   const ALLOWED_TAGS = new Set(['B','STRONG','I','EM','U','BR','P','DIV','SPAN','UL','OL','LI','A']);
   const VOID_TAGS    = new Set(['BR']);
 
   function renderMentionText(text) {
-    let out = '', last = 0, m;
-    MENTION_RE.lastIndex = 0;
-    while ((m = MENTION_RE.exec(text))) {
-      out += Utils.escapeHtml(text.slice(last, m.index));
-      const name = (m[1] || '').replace(/^,/, '').trim();
-      if (name) out += `<span class="mention-chip">${Utils.escapeHtml(name)}</span>`;
-      last = MENTION_RE.lastIndex;
-    }
-    out += Utils.escapeHtml(text.slice(last));
-    return out;
+    return Utils.escapeHtml(text.replace(MENTION_RE, ''));
   }
 
   function sanitizeNode(node) {
@@ -478,43 +471,64 @@ const ZohoProjects = (() => {
     return Array.from(doc.body.childNodes).map(sanitizeNode).join('');
   }
 
+  /* ── Zoho wraps some internal identifiers as "zp<value>zp" — unwrap them.
+     e.g. the raw name field can literally be "zpAjay Kumarzp". ── */
+  function stripZpWrap(s) {
+    const m = String(s || '').trim().match(/^zp(.+?)zp$/i);
+    return (m ? m[1] : String(s || '')).trim();
+  }
+
+  function cleanAuthorName(raw) {
+    let s = stripZpWrap(raw);
+    s = s.replace(/\[?@zpuser#\d+#([^\]]*)\]?/gi, '$1').trim();
+    return s && isNaN(s) ? s : '';
+  }
+
+  /* ── Resolve a comment's author from whichever field Zoho populated ── */
+  function resolveCommentAuthor(c) {
+    const candidates = [c.created_by, c.added_by, c.author, c.user];
+    for (const cand of candidates) {
+      if (!cand) continue;
+      if (typeof cand === 'string') {
+        const name = cleanAuthorName(cand);
+        if (name) return { name, photo: '', id: '' };
+        continue;
+      }
+      const name = cleanAuthorName(cand.name) || cleanAuthorName(cand.display_name) ||
+                   cleanAuthorName(cand.full_name) ||
+                   (cand.email ? String(cand.email).split('@')[0] : '');
+      if (name) return { name, photo: cand.photo || cand.photo_url || cand.image || '', id: cand.id || cand.zpuid || '' };
+    }
+    return { name: '', photo: '', id: '' };
+  }
+
   /* ── Fetch comments via direct API ──────────────────────── */
   async function fetchTaskComments(taskId, projectId) {
     if (!projectId) return [];
     try {
       const data = await apiGet(`/portal/${enc(PORTAL_NAME)}/projects/${enc(projectId)}/tasks/${enc(taskId)}/comments/`);
       return (data.comments || []).map(c => {
-        const raw = c.content || '';
+        const raw = c.comment ?? c.content ?? '';
         // Plain-text version (for regex-based extraction elsewhere) — mentions fully stripped
         const plain = Utils.stripHtml(raw);
         const cleanContent = plain.trim().replace(/\[?@zpuser#\d+#[^\]]*\]?/g, '').trim();
-        // Zoho comment author: skip pure-numeric values (user IDs), prefer human names
-        const addedBy = c.added_by || {};
-        const nonNumeric = v => {
-          const s = String(v || '').trim();
-          return s && isNaN(s) ? s : '';
-        };
-        const authorName = nonNumeric(addedBy.display_name)
-          || nonNumeric(addedBy.name)
-          || nonNumeric(addedBy.full_name)
-          || (addedBy.email ? addedBy.email.split('@')[0] : '')
-          || (typeof addedBy === 'string' ? nonNumeric(addedBy) : '')
-          || '';
+        const { name: authorName, photo: authorPhoto, id: authorId } = resolveCommentAuthor(c);
         const rawAtts = c.attachments || c.documents || c.files || [];
         const attachments = rawAtts.map(a => ({
-          name:    a.filename || a.file_name || a.name || 'Attachment',
+          name:    a.filename || a.file_name || a.name || a.title || 'Attachment',
           size:    a.filesize || a.file_size || a.size || 0,
-          url:     a.download_url || a.url || a.file_url || '',
-          isImage: /\.(jpe?g|png|gif|webp|bmp|heic)$/i.test(a.filename || a.file_name || a.name || ''),
+          url:     a.download_url || a.url || a.file_url || a.link || a.href || '',
+          isImage: /\.(jpe?g|png|gif|webp|bmp|heic)$/i.test(a.filename || a.file_name || a.name || a.title || ''),
         }));
         return {
           author:      authorName,
-          authorId:    addedBy.id || addedBy.zpuid || '',
+          authorPhoto,
+          authorId,
           content:     cleanContent,
           contentHtml: sanitizeCommentHtml(raw),
           attachments,
-          isEdited:    !!(c.edited_time_long || c.edited_time_string || c.is_edited),
-          createdAt:   c.time_long || c.added_time_string || '',
+          isEdited:    !!(c.edited ?? c.is_edited ?? c.edited_time_long ?? c.edited_time_string),
+          createdAt:   c.created_time || c.time_long || c.added_time_string || '',
         };
       });
     } catch { return []; }
