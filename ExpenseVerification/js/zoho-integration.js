@@ -345,12 +345,54 @@ const ZohoProjects = (() => {
     });
   }
 
+  /* ── In-memory caches for the expensive project/task brute-force scan.
+     A cold scan across every project in the portal is the slowest path
+     in this whole module (up to ~166 projects, each 1-2+ API calls) —
+     these caches make a second search in the same session cheap, either
+     because it's the exact same display ID (resolvedCache) or because it
+     lands in a project already fetched while scanning for a prior one
+     (projectsCache / tasksCache). All are session-lifetime (module-level
+     variables), not persisted, and use short TTLs since Zoho task data
+     can change while the user is working. ── */
+  const RESOLVED_CACHE_TTL = 5  * 60 * 1000;
+  const PROJECTS_CACHE_TTL = 10 * 60 * 1000;
+  const TASKS_CACHE_TTL    = 5  * 60 * 1000;
+
+  const resolvedCache = new Map(); // upper display id -> { value: {task,projectId}, at }
+  const tasksCache    = new Map(); // projectId -> { value: tasks[], at }
+  let projectsCache = null;        // { value: projects[], at }
+
+  function cacheGet(map, key, ttl) {
+    const hit = map.get(key);
+    if (hit && (Date.now() - hit.at) < ttl) return hit.value;
+    return undefined;
+  }
+  function cacheSet(map, key, value) { map.set(key, { value, at: Date.now() }); }
+
+  async function getCachedProjects() {
+    if (projectsCache && (Date.now() - projectsCache.at) < PROJECTS_CACHE_TTL) return projectsCache.value;
+    const projData = await apiGet(`/portal/${enc(PORTAL_NAME)}/projects/`);
+    const projects = projData.projects || [];
+    projectsCache = { value: projects, at: Date.now() };
+    return projects;
+  }
+
+  async function getCachedProjectTasks(projectId) {
+    const hit = cacheGet(tasksCache, projectId, TASKS_CACHE_TTL);
+    if (hit) return hit;
+    const tasks = await fetchAllTasks(projectId);
+    cacheSet(tasksCache, projectId, tasks);
+    return tasks;
+  }
+
   /* ── Resolve display ID in parallel across all projects ──── */
   async function resolveDisplayId(displayId) {
     const upper = displayId.toUpperCase();
 
-    const projData = await apiGet(`/portal/${enc(PORTAL_NAME)}/projects/`);
-    const projects  = projData.projects || [];
+    const cached = cacheGet(resolvedCache, upper, RESOLVED_CACHE_TTL);
+    if (cached) return cached;
+
+    const projects = await getCachedProjects();
     console.debug(`[Zoho] Searching ${projects.length} projects (parallel) for "${displayId}"`);
 
     // Try projects in parallel batches of 6 to avoid rate-limiting
@@ -363,7 +405,7 @@ const ZohoProjects = (() => {
         batch.map(async project => {
           const projectId  = project.id_string || project.id;
           const projPrefix = (project.prefix || project.key || project.name || '').toUpperCase();
-          const tasks = await fetchAllTasks(projectId);
+          const tasks = await getCachedProjectTasks(projectId);
           const match = matchTask(tasks, upper, projPrefix);
           if (!match) throw new Error('not found');
           if (!match.project) match.project = { id_string: projectId, name: project.name };
@@ -371,7 +413,7 @@ const ZohoProjects = (() => {
         })
       ).catch(() => null); // entire batch missed — move to next batch
 
-      if (result) return result;
+      if (result) { cacheSet(resolvedCache, upper, result); return result; }
     }
 
     throw new Error(`Task "${displayId}" not found. Checked ${projects.length} project(s).`);
@@ -382,27 +424,52 @@ const ZohoProjects = (() => {
     const input = taskId.trim();
 
     let parsed;
+    let searchTermData = null; // reused by the final fallback to avoid a duplicate call
 
     // Display ID path: e.g. "S07-T1" or "SO7-T1"
     if (/^[A-Za-z0-9]+-[Tt]\d+$/.test(input)) {
-      // resolveDisplayId throws when no project's task list contains a
-      // match — that must not abort the whole lookup, since the
-      // search_term fallback below can still find tasks whose display-ID
-      // prefix isn't derived from their project (e.g. "CA1-T2293" in a
-      // project with no "CA1" in its name or key at all).
+      // Fast path first: Zoho's own search index, a single API call,
+      // instead of the brute-force per-project scan below. Only trust an
+      // exact prefix/key match — search_term can also match loosely
+      // against task name text, and returning the wrong task silently
+      // would be worse than the slower scan.
       try {
-        const resolved = await resolveDisplayId(input);
-        if (resolved) {
-          const { task, projectId } = resolved;
-          if (!task.project) task.project = { id_string: projectId };
-          parsed = parseTask({ tasks: [task] }, input);
-        }
-      } catch { /* fall through to search_term below */ }
+        searchTermData = await apiGet(`/portal/${enc(PORTAL_NAME)}/tasks/?search_term=${enc(input)}`);
+        const candidates = Array.isArray(searchTermData.tasks) ? searchTermData.tasks : [];
+        const upper = input.toUpperCase();
+        const upperNorm = normalizeOZ(upper);
+        const exact = candidates.find(t => {
+          const prefix  = (t.prefix   || '').toUpperCase();
+          const key     = (t.key      || '').toUpperCase();
+          const taskKey = (t.task_key || '').toUpperCase();
+          return prefix === upper || key === upper || taskKey === upper ||
+                 normalizeOZ(prefix) === upperNorm || normalizeOZ(key) === upperNorm || normalizeOZ(taskKey) === upperNorm;
+        });
+        if (exact) parsed = parseTask({ tasks: [exact] }, input);
+      } catch { /* Zoho search unavailable — fall through to the scan */ }
+
+      // Slow path: brute-force scan every project's task list (cached —
+      // see getCachedProjects/getCachedProjectTasks/resolvedCache above).
+      // resolveDisplayId throws when no project's task list contains a
+      // match — that must not abort the whole lookup, since the generic
+      // fallback below can still use whatever search_term already found.
+      if (!parsed) {
+        try {
+          const resolved = await resolveDisplayId(input);
+          if (resolved) {
+            const { task, projectId } = resolved;
+            if (!task.project) task.project = { id_string: projectId };
+            parsed = parseTask({ tasks: [task] }, input);
+          }
+        } catch { /* fall through to the generic search below */ }
+      }
     }
 
     if (!parsed) {
-      // Fallback: search by term (works for numeric IDs or task names)
-      const data = await apiGet(`/portal/${enc(PORTAL_NAME)}/tasks/?search_term=${enc(input)}`);
+      // Fallback: whatever Zoho's search returned, even without an exact
+      // prefix match (works for numeric IDs or partial task names). Reuse
+      // the search_term call already made above instead of repeating it.
+      const data = searchTermData || await apiGet(`/portal/${enc(PORTAL_NAME)}/tasks/?search_term=${enc(input)}`);
       parsed = parseTask(data, input);
     }
 
