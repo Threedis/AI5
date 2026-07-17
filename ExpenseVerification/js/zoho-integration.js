@@ -324,10 +324,16 @@ const ZohoProjects = (() => {
   function matchTask(tasks, upper, projPrefix) {
     const upperNorm = normalizeOZ(upper);
     return tasks.find(t => {
+      // t.prefix is Zoho's actual display-ID field (e.g. "CA1-T2293") —
+      // confirmed against a live task whose prefix has no relation at all
+      // to its project's own key, so it must be checked directly and
+      // can't be derived from the project. t.key/t.task_key are kept as
+      // fallbacks in case an older API shape populates those instead.
+      const prefix  = (t.prefix   || '').toUpperCase();
       const key     = (t.key      || '').toUpperCase();
       const taskKey = (t.task_key || '').toUpperCase();
-      if (key === upper || taskKey === upper) return true;
-      if (normalizeOZ(key) === upperNorm || normalizeOZ(taskKey) === upperNorm) return true;
+      if (prefix === upper || key === upper || taskKey === upper) return true;
+      if (normalizeOZ(prefix) === upperNorm || normalizeOZ(key) === upperNorm || normalizeOZ(taskKey) === upperNorm) return true;
 
       // Zoho sometimes omits the "T": e.g. "SO7-1" instead of "SO7-T1"
       const seq = String(t.sequence_num || t.task_index || '');
@@ -379,12 +385,19 @@ const ZohoProjects = (() => {
 
     // Display ID path: e.g. "S07-T1" or "SO7-T1"
     if (/^[A-Za-z0-9]+-[Tt]\d+$/.test(input)) {
-      const resolved = await resolveDisplayId(input);
-      if (resolved) {
-        const { task, projectId } = resolved;
-        if (!task.project) task.project = { id_string: projectId };
-        parsed = parseTask({ tasks: [task] }, input);
-      }
+      // resolveDisplayId throws when no project's task list contains a
+      // match — that must not abort the whole lookup, since the
+      // search_term fallback below can still find tasks whose display-ID
+      // prefix isn't derived from their project (e.g. "CA1-T2293" in a
+      // project with no "CA1" in its name or key at all).
+      try {
+        const resolved = await resolveDisplayId(input);
+        if (resolved) {
+          const { task, projectId } = resolved;
+          if (!task.project) task.project = { id_string: projectId };
+          parsed = parseTask({ tasks: [task] }, input);
+        }
+      } catch { /* fall through to search_term below */ }
     }
 
     if (!parsed) {
