@@ -21,6 +21,8 @@ import * as dataCount from '../ExpenseVerification/functions/api/data/[store]/co
 import * as dataBulk from '../ExpenseVerification/functions/api/data/[store]/bulk.js';
 import * as settingsKey from '../ExpenseVerification/functions/api/settings/[key].js';
 import * as serialSet from '../ExpenseVerification/functions/api/serial/set.js';
+import * as zohoTaskIndexPost from '../ExpenseVerification/functions/api/zoho/task-index/index.js';
+import * as zohoTaskIndexGet from '../ExpenseVerification/functions/api/zoho/task-index/[taskId].js';
 
 // Ordered so more specific literal segments (count/bulk) are tried before
 // the generic :id catch-all — same precedence Pages' file-based router gives
@@ -46,6 +48,8 @@ const ROUTES = [
   { method: 'GET',    pattern: '/api/settings/:key',                handler: settingsKey.onRequestGet },
   { method: 'PUT',    pattern: '/api/settings/:key',                handler: settingsKey.onRequestPut },
   { method: 'POST',   pattern: '/api/serial/set',                   handler: serialSet.onRequestPost },
+  { method: 'POST',   pattern: '/api/zoho/task-index',               handler: zohoTaskIndexPost.onRequestPost },
+  { method: 'GET',    pattern: '/api/zoho/task-index/:taskId',       handler: zohoTaskIndexGet.onRequestGet },
 ];
 
 function matchRoute(method, pathname) {

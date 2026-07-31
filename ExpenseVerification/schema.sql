@@ -115,3 +115,23 @@ create table if not exists expense_file_log (
   data       text not null,
   created_at text default (datetime('now'))
 );
+
+-- Mirror of Zoho Projects task data, kept in sync by a Zoho Projects
+-- Deluge custom function (onTaskEvent) firing on task create/update/
+-- comment — see ExpenseVerification/functions/api/zoho/task-index/.
+-- Exists so looking up a task by its display ID (e.g. "CA1-T2293") is a
+-- single indexed read instead of scanning every project in the portal
+-- live on every search.
+create table if not exists zoho_task_index (
+  task_id          text primary key,
+  project_id       text,
+  project_name     text,
+  internal_task_id text,
+  task_name        text,
+  task_status      text,
+  employee_id      text,
+  employee_name    text,
+  claim_amount     text,
+  department       text,
+  last_sync        text default (datetime('now'))
+);
