@@ -419,34 +419,105 @@ const ZohoProjects = (() => {
     throw new Error(`Task "${displayId}" not found. Checked ${projects.length} project(s).`);
   }
 
+  /* ── D1 task index — fastest path for a display-ID lookup ──
+     The Worker keeps zoho_task_index in sync from Zoho Projects'
+     onTaskEvent custom function, so a display ID like "CA1-T2293"
+     already maps to its project ID + internal task ID. One same-origin
+     query replaces the portal-wide scan below, which is the slowest
+     path in this module.
+
+     A miss here is expected, not an error: only tasks touched since the
+     Zoho rules went live are indexed, so anything older still needs the
+     search/scan fallback. Never throw — every failure mode (404, no
+     session, Worker unreachable) must degrade to the old path. ── */
+  async function lookupTaskIndex(displayId) {
+    try {
+      const res = await fetch(`/api/zoho/task-index/${enc(displayId.toUpperCase())}`, {
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (!res.ok) return null;
+      const row = await res.json();
+      return row && row.status === 'success' ? row : null;
+    } catch { return null; }
+  }
+
+  /* ── Overlay the index's parsed employee fields onto a task ──
+     These are extracted server-side by task-extract.js, which handles
+     the real Travel Advance Request Form table layout that the
+     browser-side regexes above miss, so they take precedence over
+     whatever extractEmpIds/extractAmount found in the raw text. Any
+     field the index left blank is untouched, so the comment-scanning
+     merge downstream can still fill it. ── */
+  function applyIndexRow(parsed, row) {
+    const empId = String(row.employeeId || '').trim().toUpperCase();
+    if (empId && !parsed.empIds.includes(empId)) parsed.empIds.unshift(empId);
+    if (row.employeeName) parsed.zohoEmpName = String(row.employeeName).trim();
+
+    const amount = parseFloat(String(row.claimAmount || '').replace(/[^0-9.]/g, ''));
+    if (!isNaN(amount) && amount > 0) {
+      if (empId) parsed.zohoAmounts[empId] = amount;
+      else parsed.empIds.forEach(id => { parsed.zohoAmounts[id.toUpperCase()] = amount; });
+    }
+
+    if (!parsed.projectName && row.projectName) parsed.projectName = row.projectName;
+    parsed.fromIndex = true;
+    return parsed;
+  }
+
   /* ── Fetch task via direct API ───────────────────────────── */
   async function fetchTask(taskId) {
     const input = taskId.trim();
 
     let parsed;
+    let indexRow = null;
     let searchTermData = null; // reused by the final fallback to avoid a duplicate call
 
     // Display ID path: e.g. "S07-T1" or "SO7-T1"
     if (/^[A-Za-z0-9]+-[Tt]\d+$/.test(input)) {
-      // Fast path first: Zoho's own search index, a single API call,
+      indexRow = await lookupTaskIndex(input);
+
+      // With project + internal task ID known, the task detail is a single
+      // Zoho call. Older rows can predate those columns being populated, so
+      // both must be present before this path is worth taking.
+      if (indexRow?.projectId && indexRow?.internalTaskId) {
+        try {
+          const data = await apiGet(`/portal/${enc(PORTAL_NAME)}/projects/${enc(indexRow.projectId)}/tasks/${enc(indexRow.internalTaskId)}/`);
+          parsed = parseTask(data, input);
+          // The task-detail endpoint doesn't always echo the project back,
+          // and without a project ID the comment/attachment calls below
+          // silently return nothing.
+          if (!parsed.projectId)   parsed.projectId   = indexRow.projectId;
+          if (!parsed.projectName) parsed.projectName = indexRow.projectName || '';
+          console.debug(`[Zoho] "${input}" resolved from D1 index (project ${indexRow.projectId})`);
+        } catch (e) {
+          // Stale internal ID, or Zoho refused the call — the index is a
+          // cache, not the source of truth, so fall through to the scan.
+          console.debug(`[Zoho] index hit for "${input}" but task fetch failed:`, e.message);
+        }
+      }
+
+      // Next: Zoho's own search index, a single API call,
       // instead of the brute-force per-project scan below. Only trust an
       // exact prefix/key match — search_term can also match loosely
       // against task name text, and returning the wrong task silently
       // would be worse than the slower scan.
-      try {
-        searchTermData = await apiGet(`/portal/${enc(PORTAL_NAME)}/tasks/?search_term=${enc(input)}`);
-        const candidates = Array.isArray(searchTermData.tasks) ? searchTermData.tasks : [];
-        const upper = input.toUpperCase();
-        const upperNorm = normalizeOZ(upper);
-        const exact = candidates.find(t => {
-          const prefix  = (t.prefix   || '').toUpperCase();
-          const key     = (t.key      || '').toUpperCase();
-          const taskKey = (t.task_key || '').toUpperCase();
-          return prefix === upper || key === upper || taskKey === upper ||
-                 normalizeOZ(prefix) === upperNorm || normalizeOZ(key) === upperNorm || normalizeOZ(taskKey) === upperNorm;
-        });
-        if (exact) parsed = parseTask({ tasks: [exact] }, input);
-      } catch { /* Zoho search unavailable — fall through to the scan */ }
+      if (!parsed) {
+        try {
+          searchTermData = await apiGet(`/portal/${enc(PORTAL_NAME)}/tasks/?search_term=${enc(input)}`);
+          const candidates = Array.isArray(searchTermData.tasks) ? searchTermData.tasks : [];
+          const upper = input.toUpperCase();
+          const upperNorm = normalizeOZ(upper);
+          const exact = candidates.find(t => {
+            const prefix  = (t.prefix   || '').toUpperCase();
+            const key     = (t.key      || '').toUpperCase();
+            const taskKey = (t.task_key || '').toUpperCase();
+            return prefix === upper || key === upper || taskKey === upper ||
+                   normalizeOZ(prefix) === upperNorm || normalizeOZ(key) === upperNorm || normalizeOZ(taskKey) === upperNorm;
+          });
+          if (exact) parsed = parseTask({ tasks: [exact] }, input);
+        } catch { /* Zoho search unavailable — fall through to the scan */ }
+      }
 
       // Slow path: brute-force scan every project's task list (cached —
       // see getCachedProjects/getCachedProjectTasks/resolvedCache above).
@@ -472,6 +543,12 @@ const ZohoProjects = (() => {
       const data = searchTermData || await apiGet(`/portal/${enc(PORTAL_NAME)}/tasks/?search_term=${enc(input)}`);
       parsed = parseTask(data, input);
     }
+
+    // Applied regardless of which path produced the task: a stale internal
+    // ID can send the index path to the fallback scan, and the index's
+    // employee fields are still the better-parsed ones. Runs before the
+    // comment merge below so those only fill what the index left blank.
+    if (indexRow) applyIndexRow(parsed, indexRow);
 
     // Enrich with comments and attachments in parallel
     const [comments, attachments] = await Promise.all([
