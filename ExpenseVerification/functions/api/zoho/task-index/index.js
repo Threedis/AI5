@@ -5,7 +5,13 @@
  * function (via invokeurl) whenever a task is created, updated, or
  * commented on — not by a logged-in browser session, so auth here is a
  * shared secret header rather than the usual session cookie.
+ *
+ * Employee ID / Name / Claim Amount are parsed here from the raw task
+ * text rather than in Deluge: Deluge can't be unit-tested from the repo,
+ * and its version silently produced garbage (see task-extract.js). The
+ * caller may still send those fields explicitly, which wins over parsing.
  */
+import { extractTaskFields } from '../../_lib/task-extract.js';
 
 export async function onRequestPost({ request, env }) {
   const secret = request.headers.get('X-Webhook-Secret');
@@ -34,6 +40,19 @@ export async function onRequestPost({ request, env }) {
   };
   function toSnake(key) { return key.replace(/([A-Z])/g, '_$1').toLowerCase(); }
 
+  // Parse the employee fields out of whatever text this event carried. An
+  // "on update" event often has no comment attached, so a miss here must
+  // fall back to the stored value rather than blanking it.
+  const parsed = extractTaskFields(
+    [body.taskName, body.taskDescPlain, body.taskRecentComment].filter(Boolean).join('\n')
+  );
+  const pickParsed = (key) => {
+    const explicit = body[key];
+    if (explicit !== undefined && explicit !== null && explicit !== '') return String(explicit);
+    if (parsed[key]) return parsed[key];
+    return existing?.[toSnake(key)] ?? '';
+  };
+
   const row = {
     task_id:          taskId,
     project_id:       pick('projectId'),
@@ -41,9 +60,9 @@ export async function onRequestPost({ request, env }) {
     internal_task_id: pick('internalTaskId'),
     task_name:        pick('taskName'),
     task_status:      pick('taskStatus'),
-    employee_id:      pick('employeeId'),
-    employee_name:    pick('employeeName'),
-    claim_amount:     pick('claimAmount'),
+    employee_id:      pickParsed('employeeId'),
+    employee_name:    pickParsed('employeeName'),
+    claim_amount:     pickParsed('claimAmount'),
     department:       pick('department'),
     last_sync:        new Date().toISOString(),
   };
