@@ -93,6 +93,13 @@ async function requestWithRetry(url, init, label) {
       continue;
     }
     const body = await res.text().catch(() => '');
+    // 401 is nearly always the one-hour implicit token expiring mid-run
+    // rather than anything wrong with the request, so say so plainly —
+    // the raw Zoho message ("Invalid OAuth access token") reads like a
+    // configuration fault.
+    if (res.status === 401) {
+      throw new Error(`${label}: HTTP 401 — ZOHO_TOKEN is expired or invalid. Zoho tokens last one hour; grab a fresh one and re-run.`);
+    }
     throw new Error(`${label}: HTTP ${res.status} ${body.slice(0, 200)}`);
   }
   throw new Error(`${label}: exhausted retries`);
@@ -384,6 +391,10 @@ Environment: ZOHO_TOKEN and ZOHO_WEBHOOK_SECRET are required
   return (stats.failedProjects || stats.failedRows) ? 1 : 0;
 }
 
+// process.exit() while fetch's sockets are still closing trips a libuv
+// assertion on Windows (UV_HANDLE_CLOSING in win/async.c), which buries the
+// real error under a crash dump. Setting exitCode lets Node drain its
+// handles and exit on its own — a second or two later, but cleanly.
 main()
-  .then(code => process.exit(code))
-  .catch(err => { console.error(`\nError: ${err.message}`); process.exit(1); });
+  .then(code => { process.exitCode = code; })
+  .catch(err => { console.error(`\nError: ${err.message}`); process.exitCode = 1; });
