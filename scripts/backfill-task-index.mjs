@@ -133,40 +133,108 @@ async function listProjects() {
   );
 }
 
-/* ── Tasks for one project ──────────────────────────────────────────────
+/* ── Tasks from one task-collection endpoint ────────────────────────────
    Zoho's task endpoint defaults to open tasks only, and which parameter
    selects closed ones varies between API versions — so several variants
-   are tried and the results merged, deduplicated by internal task ID.
-   Missing closed tasks would silently leave exactly the completed
-   expense claims (the ones most likely to be looked up) unindexed. ── */
-const TASK_VARIANTS = ['status=all', 'type=open_tasks', 'type=closed_tasks', ''];
+   are tried and merged, deduplicated by internal task ID. Missing closed
+   tasks would silently leave exactly the completed expense claims (the
+   ones most likely to be looked up) unindexed.
 
-async function listProjectTasks(projectId, verbose) {
+   Paged and unpaged forms are both attempted: some portals reject the
+   index/range parameters on this endpoint outright, which would
+   otherwise look identical to "project has no tasks".
+
+   Returns { tasks, ok, errors } rather than throwing, so a project that
+   genuinely has no tasks (every request answered 200 with an empty list)
+   is distinguishable from one where every request errored. ── */
+const TASK_VARIANTS = ['status=all', '', 'type=open_tasks', 'type=closed_tasks'];
+
+async function collectTasks(basePath, label, verbose) {
   const byId = new Map();
-  let anySucceeded = false;
+  const errors = [];
+  let ok = false;
 
   for (const variant of TASK_VARIANTS) {
-    const suffix = variant ? `&${variant}` : '';
-    try {
-      const tasks = await fetchAllPages(
-        (i, r) => `/portal/${enc(PORTAL)}/projects/${enc(projectId)}/tasks/?index=${i}&range=${r}${suffix}`,
-        'tasks',
-        `tasks ${projectId} [${variant || 'default'}]`
-      );
-      anySucceeded = true;
+    for (const paged of [true, false]) {
+      let tasks;
+      try {
+        if (paged) {
+          const suffix = variant ? `&${variant}` : '';
+          tasks = await fetchAllPages(
+            (i, r) => `${basePath}?index=${i}&range=${r}${suffix}`,
+            'tasks',
+            `${label} [${variant || 'default'}${paged ? '' : ' unpaged'}]`
+          );
+        } else {
+          const data = await zohoGet(`${basePath}${variant ? `?${variant}` : ''}`, `${label} [${variant || 'default'} unpaged]`);
+          tasks = Array.isArray(data.tasks) ? data.tasks : [];
+        }
+      } catch (e) {
+        errors.push(`${variant || 'default'}${paged ? '' : '/unpaged'}: ${e.message}`);
+        if (verbose) console.error(`      ${label} ${variant || 'default'}${paged ? '' : ' unpaged'} — ${e.message}`);
+        continue;
+      }
+
+      ok = true;
       for (const t of tasks) {
         const id = String(t.id_string || t.id || '');
         if (id && !byId.has(id)) byId.set(id, t);
       }
-      // status=all covers both sets; no need to try the narrower variants.
-      if (variant === 'status=all' && tasks.length) break;
-    } catch (e) {
-      if (verbose) console.error(`    variant "${variant || 'default'}" failed: ${e.message}`);
+      // A populated result from this variant makes the unpaged retry redundant.
+      if (tasks.length) break;
     }
+    // status=all covers open and closed; the narrower variants add nothing.
+    if (ok && variant === 'status=all' && byId.size) break;
   }
 
-  if (!anySucceeded) throw new Error(`could not list tasks for project ${projectId}`);
-  return [...byId.values()];
+  return { tasks: [...byId.values()], ok, errors };
+}
+
+/* ── Tasks for one project ──────────────────────────────────────────────
+   The project-level endpoint is not enabled on every portal — the app's
+   own fetchAllTasks carries the same task-list fallback for exactly that
+   reason — so when it yields nothing, walk the project's task lists and
+   collect each one's tasks instead. ── */
+async function listProjectTasks(projectId, verbose) {
+  const projectBase = `/portal/${enc(PORTAL)}/projects/${enc(projectId)}`;
+
+  const direct = await collectTasks(`${projectBase}/tasks/`, `tasks ${projectId}`, verbose);
+  if (direct.tasks.length) return direct.tasks;
+
+  // Fall back to task lists — also the only path that works when the
+  // project-level endpoint is disabled portal-wide.
+  let tasklists = [];
+  let tasklistError = null;
+  try {
+    tasklists = await fetchAllPages(
+      (i, r) => `${projectBase}/tasklists/?index=${i}&range=${r}`,
+      'tasklists',
+      `tasklists ${projectId}`
+    );
+  } catch (e) {
+    tasklistError = e.message;
+    if (verbose) console.error(`      tasklists ${projectId} — ${e.message}`);
+  }
+
+  const byId = new Map();
+  let anyListOk = false;
+  for (const tl of tasklists) {
+    const tlId = String(tl.id_string || tl.id || '');
+    if (!tlId) continue;
+    const res = await collectTasks(`${projectBase}/tasklists/${enc(tlId)}/tasks/`, `tasks ${projectId}/tl${tlId}`, verbose);
+    if (res.ok) anyListOk = true;
+    for (const t of res.tasks) {
+      const id = String(t.id_string || t.id || '');
+      if (id && !byId.has(id)) byId.set(id, t);
+    }
+  }
+  if (byId.size) return [...byId.values()];
+
+  // Nothing anywhere: a real empty project if some request succeeded,
+  // otherwise a genuine failure whose cause must reach the operator.
+  if (direct.ok || anyListOk) return [];
+  const detail = [...direct.errors.slice(0, 2), tasklistError].filter(Boolean).join(' | ');
+  throw new Error(`could not list tasks for project ${projectId}: ${detail || 'all request variants failed'}`);
 }
 
 /* Zoho descriptions are HTML whose table cells carry the form fields.
