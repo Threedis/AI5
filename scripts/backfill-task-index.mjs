@@ -45,8 +45,15 @@ const API_BASE = (process.env.ZOHO_API_BASE || 'https://projectsapi.zoho.com/res
 const INDEX_URL = (process.env.INDEX_URL || 'https://ai5.threed.workers.dev/api/zoho/task-index').replace(/\/$/, '');
 
 const PAGE_SIZE   = 200;  // Zoho's documented maximum for index/range paging
-const CONCURRENCY = 4;    // parallel projects; higher invites 429s
-const MAX_RETRIES = 4;
+const CONCURRENCY = 2;    // parallel projects; the rate gate is the real control
+const MAX_RETRIES = 6;
+
+/* Zoho caps this API at 100 requests per minute and reports breaching it
+   as a 400 (not a 429), so the cap has to be respected proactively —
+   reacting after the fact means every in-flight request fails at once.
+   The default leaves headroom for retries. */
+const RATE_LIMIT = parseInt(process.env.ZOHO_RATE_LIMIT || '80', 10);
+const RATE_WINDOW_MS = 60_000;
 
 const enc = encodeURIComponent;
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
@@ -66,13 +73,43 @@ function parseArgs(argv) {
   return opts;
 }
 
+/* ── Outbound rate gate ─────────────────────────────────────────────────
+   Sliding window over the last minute, shared by every request to Zoho.
+   Requests wait their turn rather than being rejected, because a breach
+   fails whatever happens to be in flight rather than queueing it. ── */
+const recentRequests = [];
+let gateNoticeShown = false;
+
+async function rateGate() {
+  for (;;) {
+    const now = Date.now();
+    while (recentRequests.length && now - recentRequests[0] > RATE_WINDOW_MS) recentRequests.shift();
+    if (recentRequests.length < RATE_LIMIT) { recentRequests.push(now); return; }
+    const waitMs = RATE_WINDOW_MS - (now - recentRequests[0]) + 50;
+    if (!gateNoticeShown) {
+      gateNoticeShown = true;
+      console.log(`  (holding at ${RATE_LIMIT} requests/min — Zoho's cap is 100)`);
+    }
+    await sleep(waitMs);
+  }
+}
+
+/* Zoho reports its per-minute cap as a 400 whose body explains the real
+   reason, so status alone cannot classify it and the body must be read
+   before deciding whether a failure is permanent. */
+function isRateLimitBody(body) {
+  return /cannot execute more than|requests per minute|rate limit|too many requests/i.test(body);
+}
+
 /* ── HTTP with retry ────────────────────────────────────────────────────
-   429 and 5xx are retried with exponential backoff; 4xx other than 429 is
-   a permanent failure and returns immediately so a misconfigured token
-   fails fast instead of retrying 166 times. ── */
-async function requestWithRetry(url, init, label) {
+   Retries 429, 5xx, and any status whose body reveals a rate-limit
+   breach. Other 4xx is permanent and returns immediately, so a bad token
+   or URL fails fast instead of retrying once per project. ── */
+async function requestWithRetry(url, init, label, { gated = false } = {}) {
   let delay = 1000;
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    if (gated) await rateGate();
+
     let res;
     try {
       res = await fetch(url, init);
@@ -82,17 +119,25 @@ async function requestWithRetry(url, init, label) {
       continue;
     }
     if (res.ok) return res;
-    if (res.status === 429 || res.status >= 500) {
+
+    const body = await res.text().catch(() => '');
+    const throttled = res.status === 429 || isRateLimitBody(body);
+
+    if (throttled || res.status >= 500) {
       if (attempt === MAX_RETRIES) {
-        throw new Error(`${label}: HTTP ${res.status} after ${MAX_RETRIES} attempts`);
+        throw new Error(`${label}: HTTP ${res.status} after ${MAX_RETRIES} attempts ${body.slice(0, 160)}`);
       }
-      // Honour Retry-After when Zoho sends one.
       const retryAfter = parseInt(res.headers.get('Retry-After') || '', 10);
-      await sleep(Number.isFinite(retryAfter) ? retryAfter * 1000 : delay);
+      // A per-minute cap only clears when the window rolls, so short
+      // exponential backoff would just burn attempts against it.
+      const waitMs = Number.isFinite(retryAfter) ? retryAfter * 1000
+                   : throttled ? RATE_WINDOW_MS / 2
+                   : delay;
+      await sleep(waitMs);
       delay *= 2;
       continue;
     }
-    const body = await res.text().catch(() => '');
+
     // 401 is nearly always the one-hour implicit token expiring mid-run
     // rather than anything wrong with the request, so say so plainly —
     // the raw Zoho message ("Invalid OAuth access token") reads like a
@@ -108,7 +153,7 @@ async function requestWithRetry(url, init, label) {
 async function zohoGet(path, label) {
   const res = await requestWithRetry(`${API_BASE}${path}`, {
     headers: { Authorization: `Zoho-oauthtoken ${TOKEN}` },
-  }, label);
+  }, label, { gated: true });
   const text = await res.text();
   return text ? JSON.parse(text) : {};
 }
@@ -156,26 +201,56 @@ async function listProjects() {
    is distinguishable from one where every request errored. ── */
 const TASK_VARIANTS = ['status=all', '', 'type=open_tasks', 'type=closed_tasks'];
 
-async function collectTasks(basePath, label, verbose) {
+/* Probing every variant on every project is what breaches the per-minute
+   cap: 166 projects x 8 combinations is an order of magnitude more
+   requests than the work needs. The first combination that answers for a
+   given endpoint shape holds for the whole portal, so it is remembered
+   and used alone from then on; a later failure falls back to the full
+   sweep, so learning wrong is recoverable rather than fatal. */
+const learnedVariant = { project: null, tasklist: null };
+
+async function attemptVariant(basePath, label, variant, paged) {
+  if (paged) {
+    const suffix = variant ? `&${variant}` : '';
+    return fetchAllPages(
+      (i, r) => `${basePath}?index=${i}&range=${r}${suffix}`,
+      'tasks',
+      `${label} [${variant || 'default'}]`
+    );
+  }
+  const data = await zohoGet(`${basePath}${variant ? `?${variant}` : ''}`, `${label} [${variant || 'default'} unpaged]`);
+  return Array.isArray(data.tasks) ? data.tasks : [];
+}
+
+async function collectTasks(basePath, label, verbose, kind = 'project') {
   const byId = new Map();
   const errors = [];
   let ok = false;
+
+  // Known-good combination first — one request instead of up to eight.
+  const learned = learnedVariant[kind];
+  if (learned) {
+    try {
+      const tasks = await attemptVariant(basePath, label, learned.variant, learned.paged);
+      for (const t of tasks) {
+        const id = String(t.id_string || t.id || '');
+        if (id && !byId.has(id)) byId.set(id, t);
+      }
+      // A known-good endpoint answering empty means the collection really
+      // is empty, so there is nothing for a sweep to discover. `trusted`
+      // lets the caller skip its own fallback on the same reasoning.
+      return { tasks: [...byId.values()], ok: true, errors, trusted: true };
+    } catch (e) {
+      errors.push(`learned ${learned.variant || 'default'}: ${e.message}`);
+      if (verbose) console.error(`      ${label} learned variant failed, re-probing — ${e.message}`);
+    }
+  }
 
   for (const variant of TASK_VARIANTS) {
     for (const paged of [true, false]) {
       let tasks;
       try {
-        if (paged) {
-          const suffix = variant ? `&${variant}` : '';
-          tasks = await fetchAllPages(
-            (i, r) => `${basePath}?index=${i}&range=${r}${suffix}`,
-            'tasks',
-            `${label} [${variant || 'default'}${paged ? '' : ' unpaged'}]`
-          );
-        } else {
-          const data = await zohoGet(`${basePath}${variant ? `?${variant}` : ''}`, `${label} [${variant || 'default'} unpaged]`);
-          tasks = Array.isArray(data.tasks) ? data.tasks : [];
-        }
+        tasks = await attemptVariant(basePath, label, variant, paged);
       } catch (e) {
         errors.push(`${variant || 'default'}${paged ? '' : '/unpaged'}: ${e.message}`);
         if (verbose) console.error(`      ${label} ${variant || 'default'}${paged ? '' : ' unpaged'} — ${e.message}`);
@@ -187,8 +262,16 @@ async function collectTasks(basePath, label, verbose) {
         const id = String(t.id_string || t.id || '');
         if (id && !byId.has(id)) byId.set(id, t);
       }
-      // A populated result from this variant makes the unpaged retry redundant.
-      if (tasks.length) break;
+      // Only a combination that actually returned tasks is worth
+      // remembering — an empty 200 proves nothing about which parameters
+      // this portal honours.
+      if (tasks.length) {
+        if (!learnedVariant[kind]) {
+          learnedVariant[kind] = { variant, paged };
+          if (verbose) console.error(`      learned ${kind} variant: ${variant || 'default'}${paged ? '' : ' unpaged'}`);
+        }
+        break;
+      }
     }
     // status=all covers open and closed; the narrower variants add nothing.
     if (ok && variant === 'status=all' && byId.size) break;
@@ -205,8 +288,13 @@ async function collectTasks(basePath, label, verbose) {
 async function listProjectTasks(projectId, verbose) {
   const projectBase = `/portal/${enc(PORTAL)}/projects/${enc(projectId)}`;
 
-  const direct = await collectTasks(`${projectBase}/tasks/`, `tasks ${projectId}`, verbose);
+  const direct = await collectTasks(`${projectBase}/tasks/`, `tasks ${projectId}`, verbose, 'project');
   if (direct.tasks.length) return direct.tasks;
+
+  // An empty answer from a variant already proven on this portal means the
+  // project has no tasks — walking its task lists would be one wasted
+  // request per project against a per-minute budget.
+  if (direct.trusted) return [];
 
   // Fall back to task lists — also the only path that works when the
   // project-level endpoint is disabled portal-wide.
@@ -228,7 +316,7 @@ async function listProjectTasks(projectId, verbose) {
   for (const tl of tasklists) {
     const tlId = String(tl.id_string || tl.id || '');
     if (!tlId) continue;
-    const res = await collectTasks(`${projectBase}/tasklists/${enc(tlId)}/tasks/`, `tasks ${projectId}/tl${tlId}`, verbose);
+    const res = await collectTasks(`${projectBase}/tasklists/${enc(tlId)}/tasks/`, `tasks ${projectId}/tl${tlId}`, verbose, 'tasklist');
     if (res.ok) anyListOk = true;
     for (const t of res.tasks) {
       const id = String(t.id_string || t.id || '');
