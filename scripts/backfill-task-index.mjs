@@ -36,6 +36,20 @@
  *
  * --dry-run performs every read and prints what would be written without
  * sending anything. Start there, then --limit, then the full run.
+ *
+ * ── Working in batches ─────────────────────────────────────────────────
+ * --skip pairs with --limit to cover the portal a slice at a time, which
+ * matters because the token expires after an hour and the run is paced
+ * against Zoho's per-minute cap:
+ *
+ *   node scripts/backfill-task-index.mjs --limit 10           # 1-10
+ *   node scripts/backfill-task-index.mjs --skip 10 --limit 10 # 11-20
+ *   node scripts/backfill-task-index.mjs --skip 20 --limit 10 # 21-30
+ *
+ * Each run prints the command for the next batch. Zoho returns projects
+ * in a stable order, so the same slice addresses the same projects across
+ * runs; re-running a batch is harmless either way, since rows are keyed
+ * by display ID and simply overwritten.
  */
 
 const TOKEN    = process.env.ZOHO_TOKEN || '';
@@ -59,7 +73,7 @@ const enc = encodeURIComponent;
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
 function parseArgs(argv) {
-  const opts = { dryRun: false, limit: 0, idsOnly: false, verbose: false };
+  const opts = { dryRun: false, limit: 0, skip: 0, idsOnly: false, verbose: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--dry-run') opts.dryRun = true;
@@ -67,6 +81,8 @@ function parseArgs(argv) {
     else if (a === '--verbose' || a === '-v') opts.verbose = true;
     else if (a === '--limit') opts.limit = parseInt(argv[++i], 10) || 0;
     else if (a.startsWith('--limit=')) opts.limit = parseInt(a.slice(8), 10) || 0;
+    else if (a === '--skip') opts.skip = parseInt(argv[++i], 10) || 0;
+    else if (a.startsWith('--skip=')) opts.skip = parseInt(a.slice(7), 10) || 0;
     else if (a === '--help' || a === '-h') opts.help = true;
     else throw new Error(`Unknown option: ${a}`);
   }
@@ -400,7 +416,8 @@ async function main() {
     console.log(`Usage: node scripts/backfill-task-index.mjs [options]
 
   --dry-run     read everything, write nothing (start here)
-  --limit N     only process the first N projects
+  --limit N     only process N projects
+  --skip N      start N projects in (use with --limit to work in batches)
   --ids-only    index IDs only; leaves stored employee fields untouched
   --verbose     report per-variant task-listing failures
   --help
@@ -419,11 +436,20 @@ Environment: ZOHO_TOKEN and ZOHO_WEBHOOK_SECRET are required
   console.log(`mode      : ${opts.dryRun ? 'DRY RUN — nothing will be written' : 'LIVE'}${opts.idsOnly ? ' (ids only)' : ''}\n`);
 
   console.log('Listing projects…');
-  let projects = await listProjects();
-  console.log(`  ${projects.length} project(s) found`);
-  if (opts.limit) {
-    projects = projects.slice(0, opts.limit);
-    console.log(`  limited to first ${projects.length}`);
+  const allProjects = await listProjects();
+  console.log(`  ${allProjects.length} project(s) found`);
+
+  // Zoho returns projects in a stable order, so --skip/--limit address the
+  // same slice run to run — which is what makes resuming in batches work.
+  const from = opts.skip;
+  const to = opts.limit ? from + opts.limit : allProjects.length;
+  const projects = allProjects.slice(from, to);
+  if (from || opts.limit) {
+    console.log(`  processing ${from + 1}-${Math.min(to, allProjects.length)} of ${allProjects.length}`);
+  }
+  if (!projects.length) {
+    console.log('\nNothing to do — --skip is at or past the end of the list.');
+    return 0;
   }
 
   const stats = { tasks: 0, indexed: 0, noDisplayId: 0, failedProjects: 0, failedRows: 0 };
@@ -438,7 +464,7 @@ Environment: ZOHO_TOKEN and ZOHO_WEBHOOK_SECRET are required
       tasks = await listProjectTasks(projectId, opts.verbose);
     } catch (e) {
       stats.failedProjects++;
-      console.error(`  [${++done}/${projects.length}] ${label} — FAILED: ${e.message}`);
+      console.error(`  [${from + (++done)}/${allProjects.length}] ${label} — FAILED: ${e.message}`);
       return;
     }
 
@@ -461,7 +487,7 @@ Environment: ZOHO_TOKEN and ZOHO_WEBHOOK_SECRET are required
         console.error(`      ${row.taskId} — FAILED: ${e.message}`);
       }
     }
-    console.log(`  [${++done}/${projects.length}] ${label} — ${tasks.length} task(s), ${wrote} indexed`);
+    console.log(`  [${from + (++done)}/${allProjects.length}] ${label} — ${tasks.length} task(s), ${wrote} indexed`);
   });
 
   const secs = ((Date.now() - startedAt) / 1000).toFixed(1);
@@ -471,6 +497,11 @@ Environment: ZOHO_TOKEN and ZOHO_WEBHOOK_SECRET are required
   console.log(`  skipped (no display ID): ${stats.noDisplayId}`);
   console.log(`  projects failed       : ${stats.failedProjects}`);
   console.log(`  rows failed           : ${stats.failedRows}`);
+
+  const nextFrom = Math.min(to, allProjects.length);
+  if (nextFrom < allProjects.length) {
+    console.log(`\nNext batch:\n  node scripts/backfill-task-index.mjs --skip ${nextFrom}${opts.limit ? ` --limit ${opts.limit}` : ''}${opts.dryRun ? ' --dry-run' : ''}`);
+  }
 
   if (!opts.dryRun) {
     console.log('\nVerify with:');
