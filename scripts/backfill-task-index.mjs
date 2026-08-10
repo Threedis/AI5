@@ -67,7 +67,13 @@ const MAX_RETRIES = 6;
    reacting after the fact means every in-flight request fails at once.
    The default leaves headroom for retries. */
 const RATE_LIMIT = parseInt(process.env.ZOHO_RATE_LIMIT || '80', 10);
-const RATE_WINDOW_MS = 60_000;
+const RATE_WINDOW_MS = parseInt(process.env.ZOHO_RATE_WINDOW_MS || '60000', 10);
+const GATE_NOTICE_INTERVAL_MS = 5_000;
+
+/* Node's fetch has no default timeout, so a connection that stalls without
+   resetting would hang the whole run with no output — indistinguishable
+   from the rate gate's own long pauses. */
+const REQUEST_TIMEOUT_MS = parseInt(process.env.ZOHO_TIMEOUT_MS || '30000', 10);
 
 const enc = encodeURIComponent;
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
@@ -94,7 +100,7 @@ function parseArgs(argv) {
    Requests wait their turn rather than being rejected, because a breach
    fails whatever happens to be in flight rather than queueing it. ── */
 const recentRequests = [];
-let gateNoticeShown = false;
+let lastGateNotice = 0;
 
 async function rateGate() {
   for (;;) {
@@ -102,9 +108,12 @@ async function rateGate() {
     while (recentRequests.length && now - recentRequests[0] > RATE_WINDOW_MS) recentRequests.shift();
     if (recentRequests.length < RATE_LIMIT) { recentRequests.push(now); return; }
     const waitMs = RATE_WINDOW_MS - (now - recentRequests[0]) + 50;
-    if (!gateNoticeShown) {
-      gateNoticeShown = true;
-      console.log(`  (holding at ${RATE_LIMIT} requests/min — Zoho's cap is 100)`);
+    // These pauses run to a minute. Announcing them once and then going
+    // quiet makes a working run indistinguishable from a hung one, so say
+    // so every time — rate-limited to keep two workers from doubling it.
+    if (now - lastGateNotice > GATE_NOTICE_INTERVAL_MS) {
+      lastGateNotice = now;
+      console.log(`  … pausing ${Math.ceil(waitMs / 1000)}s for the rate window (holding at ${RATE_LIMIT} req/min; Zoho's cap is 100)`);
     }
     await sleep(waitMs);
   }
@@ -128,9 +137,12 @@ async function requestWithRetry(url, init, label, { gated = false } = {}) {
 
     let res;
     try {
-      res = await fetch(url, init);
+      res = await fetch(url, { ...init, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
     } catch (e) {
-      if (attempt === MAX_RETRIES) throw new Error(`${label}: ${e.message}`);
+      const timedOut = e.name === 'TimeoutError' || e.name === 'AbortError';
+      const reason = timedOut ? `no response in ${REQUEST_TIMEOUT_MS}ms` : e.message;
+      if (attempt === MAX_RETRIES) throw new Error(`${label}: ${reason}`);
+      if (timedOut) console.error(`      ${label} — ${reason}, retrying`);
       await sleep(delay); delay *= 2;
       continue;
     }
