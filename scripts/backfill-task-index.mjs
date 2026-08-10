@@ -505,7 +505,7 @@ Environment: ZOHO_TOKEN and ZOHO_WEBHOOK_SECRET are required
 
   if (!opts.dryRun) {
     console.log('\nVerify with:');
-    console.log('  npx wrangler d1 execute evs-db --remote --command="select count(*) as rows from zoho_task_index"');
+    console.log('  npx wrangler d1 execute expenseverify --remote --command="select count(*) as rows from zoho_task_index"');
   }
   return (stats.failedProjects || stats.failedRows) ? 1 : 0;
 }
