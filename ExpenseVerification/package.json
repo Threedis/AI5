@@ -6,10 +6,10 @@
   "scripts": {
     "start": "node server.js",
     "install-mcp": "npm install @modelcontextprotocol/sdk",
-    "db:migrate": "wrangler d1 execute evs-db --file=schema.sql",
-    "db:seed": "wrangler d1 execute evs-db --file=seed.sql",
-    "db:migrate:local": "wrangler d1 execute evs-db --local --file=schema.sql",
-    "db:seed:local": "wrangler d1 execute evs-db --local --file=seed.sql",
+    "db:migrate": "wrangler d1 execute expenseverify --file=schema.sql",
+    "db:seed": "wrangler d1 execute expenseverify --file=seed.sql",
+    "db:migrate:local": "wrangler d1 execute expenseverify --local --file=schema.sql",
+    "db:seed:local": "wrangler d1 execute expenseverify --local --file=seed.sql",
     "pages:dev": "wrangler pages dev . --d1=DB"
   },
   "dependencies": {

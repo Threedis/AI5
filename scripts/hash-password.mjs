@@ -19,10 +19,10 @@
  *
  *   node scripts/hash-password.mjs --stdin <<< 'My Password'
  *
- * Applying the result (evs-db is the D1 `database_name`, not the Pages
- * project name — drop --remote to hit the local dev database instead):
+ * Applying the result (expenseverify is the D1 database; drop --remote to
+ * hit the local dev database instead):
  *
- *   npx wrangler d1 execute evs-db --remote --command="<the printed SQL>"
+ *   npx wrangler d1 execute expenseverify --remote --command="<the printed SQL>"
  */
 import crypto from 'node:crypto';
 import { hashPassword, verifyPassword } from '../ExpenseVerification/functions/api/_lib/auth.js';
@@ -120,11 +120,11 @@ async function main() {
   console.log('\nSQL:\n');
   console.log(sql);
   console.log('\nApply with:\n');
-  console.log(`  npx wrangler d1 execute evs-db --remote --command="${sql.replace(/"/g, '\\"')}"`);
+  console.log(`  npx wrangler d1 execute expenseverify --remote --command="${sql.replace(/"/g, '\\"')}"`);
   console.log('\nThe update affects nothing if that username does not exist — check with:\n');
-  console.log('  npx wrangler d1 execute evs-db --remote --command="select username, role, status from profiles"');
+  console.log('  npx wrangler d1 execute expenseverify --remote --command="select username, role, status from profiles"');
   console.log('\nExisting sessions stay valid; revoke them with:\n');
-  console.log('  npx wrangler d1 execute evs-db --remote --command="delete from sessions"\n');
+  console.log('  npx wrangler d1 execute expenseverify --remote --command="delete from sessions"\n');
   return 0;
 }
 
